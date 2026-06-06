@@ -1,0 +1,41 @@
+{
+  "name": "remotely-cli",
+  "version": "0.1.0",
+  "description": "Secure remote device management CLI for SSH & Telnet, optimized for AI agents and developer workflows",
+  "bin": {
+    "remotely": "./bin/index.js"
+  },
+  "scripts": {
+    "install": "node scripts/install.js"
+  },
+  "files": [
+    "bin/index.js",
+    "scripts/install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EryrizalH/remotely-cli.git"
+  },
+  "keywords": [
+    "ssh",
+    "telnet",
+    "cli",
+    "agent",
+    "ai",
+    "credentials",
+    "remote",
+    "execution",
+    "security",
+    "command-runner",
+    "automation",
+    "devops"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/EryrizalH/remotely-cli/issues"
+  },
+  "homepage": "https://github.com/EryrizalH/remotely-cli#readme"
+}

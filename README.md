@@ -1,63 +1,145 @@
 # Remotely CLI (`remotely`)
 
-A secure, agent-friendly remote execution and connection manager for SSH and Telnet, designed specifically to enable AI agents (and human developers) to control multiple servers/devices without having plain-text passwords or keys exposed in scripts, command histories, or agent prompts.
+<div align="center">
+  <p><strong>A secure, agent-friendly remote execution and connection manager for SSH & Telnet.</strong></p>
+  <p>
+    <a href="https://www.npmjs.com/package/remotely-cli"><img src="https://img.shields.io/npm/v/remotely-cli.svg?style=flat-square&color=blue" alt="NPM Version" /></a>
+    <a href="https://github.com/EryrizalH/remotely-cli/actions"><img src="https://img.shields.io/github/actions/workflow/status/EryrizalH/remotely-cli/release.yml?branch=main&style=flat-square" alt="Build Status" /></a>
+    <a href="https://github.com/EryrizalH/remotely-cli/blob/main/LICENSE"><img src="https://img.shields.io/github/license/EryrizalH/remotely-cli.svg?style=flat-square" alt="License" /></a>
+  </p>
+</div>
 
-## Features
-- **Zero Exposed Credentials**: Passwords and keys are kept in an encrypted credential store on disk (`~/.remotely/credentials.enc`).
-- **One-time Master Password**: Provide your master key via the `REMOTELY_KEY` environment variable or via terminal prompts. Once set, commands bypass password prompts.
-- **Auto Sudo Handling**: Remotely detects if a device supports `sudo` and automatically inputs the sudo password securely when required.
-- **SSH & Telnet Support**: Connects to modern servers via SSH (supporting passwords and private keys) or legacy switches/routers via Telnet.
-- **Agent-optimized**: Clean separation of stdout/stderr and correct exit codes, making it perfect for tool calling.
+---
+
+**Remotely CLI** enables AI agents (and human developers) to control multiple servers, switches, and remote devices via SSH or Telnet without exposing plain-text credentials, SSH keys, or passwords in terminal histories, shell scripts, or agent prompts. 
+
+By keeping credentials encrypted on-disk and using automatic prompt interception, Remotely CLI bridges the gap between powerful automation and strict security.
+
+---
+
+## Key Features
+
+- 🔒 **Zero-Exposure Credentials**: Device passwords and private keys are encrypted locally using AES-256-GCM (Key derivation via Argon2id) in a local SQLite database (`~/.remotely/credentials.enc`).
+- 🔑 **Bypass Interactive Prompts**: Set the `REMOTELY_KEY` environment variable in your agent's context. Once defined, `remotely` retrieves credentials and connects without prompting for passwords.
+- ⚡ **Auto Sudo Handling**: Automatically detects remote `sudo` password prompts and securely injects the registered sudo password.
+- 🌐 **Dual Protocol Support**: Connects to modern servers via **SSH** (supports password & private key authentication) or legacy switches/routers via **Telnet**.
+- 🤖 **Optimized for AI Tool-Calling**: Native exit code forwarding and separation of stdout/stderr make it easy for LLMs to parse outcomes and react programmatically.
+
+---
 
 ## Installation
-Ensure you have Rust/Cargo installed:
+
+### Via NPM (Recommended)
+Install globally to make the `remotely` command available system-wide:
 ```bash
-cargo install --path .
+npm install -g remotely-cli
+```
+*The installer will automatically download the correct precompiled native binary for your OS and architecture. If a precompiled binary isn't available, it will automatically attempt to compile it from source via cargo.*
+
+### Via Cargo (Rust toolchain)
+If you prefer to compile manually from source using Cargo:
+```bash
+cargo install --git https://github.com/EryrizalH/remotely-cli.git
 ```
 
+---
+
 ## Quick Start
-1. **Initialize the Credential Store**:
-   ```bash
-   remotely init
-   ```
-   *This prompts you for a Master Password to encrypt your storage.*
 
-2. **Set the environment variable** to avoid interactive prompts in scripts/agents:
-   ```bash
-   # Linux/macOS
-   export REMOTELY_KEY="your-master-password"
-   
-   # Windows PowerShell
-   $env:REMOTELY_KEY="your-master-password"
-   ```
+### 1. Initialize the Encrypted Store
+Create the database and set your Master Password:
+```bash
+remotely init
+```
+*This creates the database at `~/.remotely/credentials.enc`. You will be prompted to enter a Master Password. Remember this password, as it is required to decrypt the store.*
 
-3. **Register a Device**:
-   ```bash
-   remotely add
-   ```
-   Follow the prompts to add details: name, IP, port, username, password/SSH key, etc. The connection will be tested automatically.
+### 2. Set the Master Password Environment Variable
+To run commands non-interactively (ideal for shell scripts and AI agents), export your master password:
 
-4. **List Registered Devices**:
-   ```bash
-   remotely list
-   ```
+**Linux / macOS:**
+```bash
+export REMOTELY_KEY="your-master-password"
+```
 
-5. **Run a Command**:
-   ```bash
-   remotely deviceA ifconfig
-   remotely deviceA "cd /var/log && cat auth.log | tail -n 20"
-   ```
+**Windows PowerShell:**
+```powershell
+$env:REMOTELY_KEY="your-master-password"
+```
 
-6. **Run Sudo Command**:
-   ```bash
-   remotely deviceA sudo service nginx restart
-   ```
+### 3. Add a Remote Device
+Register a device interactively. The connection is tested automatically before saving:
+```bash
+remotely add
+```
+*You will be prompted for device details (name, host, port, username, connection type: ssh/telnet, and credentials).*
 
-## Commands
-- `remotely init`: Set up the secure credential store.
-- `remotely add`: Interactively add a new device configuration.
-- `remotely list`: Table view of all registered devices (passwords masked).
-- `remotely remove <device_name>`: Remove a device.
-- `remotely edit <device_name>`: Modify an existing device.
-- `remotely test <device_name>`: Verify connectivity and credentials.
-- `remotely <device_name> <command...>`: Execute a remote command.
+### 4. List Registered Devices
+Review your configured devices (passwords and sensitive keys are masked):
+```bash
+remotely list
+```
+
+### 5. Execute Remote Commands
+Execute command(s) on a registered device:
+```bash
+# Simple single command
+remotely my-server-name uname -a
+
+# Multi-stage or piped commands (use quotes)
+remotely my-server-name "cd /var/log && cat syslog | tail -n 20"
+```
+
+---
+
+## Command Reference
+
+| Command | Description |
+|:---|:---|
+| `remotely init` | Set up the secure encrypted credential database. |
+| `remotely add` | Add a new device configuration (SSH or Telnet) interactively. |
+| `remotely list` | Display a table of all registered devices. |
+| `remotely remove <name>` | Delete a device from the database. |
+| `remotely edit <name>` | Interactively edit the configuration of a device. |
+| `remotely test <name>` | Verify connection settings and credentials for a device. |
+| `remotely <name> <command...>` | Run a command on the target device and return the output. |
+
+### Global Options
+
+- `--timeout <seconds>`: Override the execution timeout (default: `30` seconds).
+- `--db-path <path>`: Specify a custom path to the encrypted database (default: `~/.remotely/credentials.enc`).
+
+Example:
+```bash
+remotely --timeout 60 --db-path ./custom.db my-device "df -h"
+```
+
+---
+
+## Security & Mechanics
+
+### Auto-Sudo Prompt Interception
+When executing remote commands, `remotely` monitors the terminal streams. If it detects a password prompt (e.g. `[sudo] password for ...:`), it automatically inputs the stored sudo password (or SSH/Telnet password if a separate sudo password isn't set) and presses Enter. This prevents interactive hangs in automation scripts or AI sessions.
+
+### Encryption Standard
+- **Key Derivation**: Argon2id is used to derive a key from your Master Password.
+- **Cipher**: AES-256-GCM is used to encrypt and decrypt the credential store on read/write.
+- **Memory Safety**: Sensitive keys are wiped from process memory when no longer needed using the `zeroize` crate.
+
+---
+
+## Guidelines for AI Agent Integration
+
+If you are equipping an AI agent (e.g., Claude Code, ChatGPT, Gemini) with this tool, add the following to the agent's instructions:
+
+> [!TIP]
+> **AI Agent Instructions for `remotely` usage:**
+> - To check configured servers, run `remotely list`.
+> - Ensure the `REMOTELY_KEY` environment variable is loaded in your execution context before running commands.
+> - When running commands with pipes (`|`), redirects (`>`), or multiple instructions, group them in a single string, e.g., `remotely server-name "command1 && command2 | grep foo"`.
+> - Check exit codes: a non-zero exit code represents a remote command failure or connection loss.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
