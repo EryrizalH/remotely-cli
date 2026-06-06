@@ -1,0 +1,86 @@
+use clap::Parser;
+use std::path::Path;
+use std::process;
+
+use remotely_cli::cli::{Cli, Commands};
+use remotely_cli::commands;
+use remotely_cli::error::RemotelyError;
+
+fn main() {
+    let args = Cli::parse();
+
+    match run_app(args) {
+        Ok(exit_code) => {
+            process::exit(exit_code);
+        }
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            process::exit(err.exit_code());
+        }
+    }
+}
+
+fn run_app(args: Cli) -> Result<i32, RemotelyError> {
+    let db_path = args.db_path.as_ref().map(Path::new);
+    let timeout = args.timeout;
+
+    match args.command {
+        Some(Commands::Init) => {
+            commands::init::run(db_path)?;
+            Ok(0)
+        }
+        Some(Commands::Add) => {
+            commands::add::run(db_path, timeout)?;
+            Ok(0)
+        }
+        Some(Commands::Remove { name }) => {
+            commands::remove::run(db_path, &name)?;
+            Ok(0)
+        }
+        Some(Commands::Edit { name }) => {
+            commands::edit::run(db_path, &name, timeout)?;
+            Ok(0)
+        }
+        Some(Commands::List) => {
+            commands::list::run(db_path)?;
+            Ok(0)
+        }
+        Some(Commands::Test { name }) => {
+            commands::test::run(db_path, &name, timeout)?;
+            Ok(0)
+        }
+        Some(Commands::External(ext_args)) => {
+            if ext_args.is_empty() {
+                // Should not happen with Clap subcommands, but handle safely
+                eprintln!("No device or command specified. Run 'remotely --help' for help.");
+                return Ok(1);
+            }
+
+            let string_args: Vec<String> = ext_args
+                .into_iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect();
+
+            let device_name = &string_args[0];
+            let cmd_args = &string_args[1..];
+
+            if cmd_args.is_empty() {
+                return Err(RemotelyError::Cli(format!(
+                    "No remote command provided for device '{}'. Usage: remotely {} <command>...",
+                    device_name, device_name
+                )));
+            }
+
+            let exit_code = commands::exec::run(db_path, device_name, cmd_args, timeout)?;
+            Ok(exit_code)
+        }
+        None => {
+            // No subcommand or external arguments passed
+            use clap::CommandFactory;
+            let mut cmd = Cli::command();
+            cmd.print_help().map_err(|e| RemotelyError::Other(e.to_string()))?;
+            println!(); // Print newline
+            Ok(0)
+        }
+    }
+}

@@ -1,0 +1,57 @@
+use clap::{Parser, Subcommand};
+use std::ffi::OsString;
+
+#[derive(Parser, Debug)]
+#[command(
+    name = "remotely",
+    about = "Secure remote device management CLI for AI agents",
+    version = "0.1.0",
+    allow_external_subcommands = true
+)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+
+    /// Override the timeout for command execution (in seconds)
+    #[arg(long, global = true, default_value = "30")]
+    pub timeout: u64,
+
+    /// Custom path to the encrypted credential store
+    #[arg(long, global = true)]
+    pub db_path: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Initialize the encrypted credential store and set master password
+    Init,
+
+    /// Add a new remote device (SSH/Telnet)
+    Add,
+
+    /// Remove a registered remote device
+    Remove {
+        /// Name of the device to remove
+        name: String,
+    },
+
+    /// Edit credentials/details of an existing device
+    Edit {
+        /// Name of the device to edit
+        name: String,
+    },
+
+    /// List all registered remote devices (passwords masked)
+    List,
+
+    /// Test the connection to a registered device
+    Test {
+        /// Name of the device to test
+        name: String,
+    },
+
+    // Catch-all for executing commands on a device
+    // E.g. `remotely deviceA ls -la`
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
+}
