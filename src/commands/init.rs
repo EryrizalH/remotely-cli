@@ -7,8 +7,7 @@ use crate::error::RemotelyError;
 pub fn run(db_path: Option<&Path>) -> Result<(), RemotelyError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
-        None => credentials::get_default_db_path()
-            .map_err(|e| RemotelyError::Other(e.to_string()))?,
+        None => credentials::get_default_db_path()?,
     };
 
     if resolved_path.exists() {
@@ -40,12 +39,14 @@ pub fn run(db_path: Option<&Path>) -> Result<(), RemotelyError> {
     }
 
     let store = CredentialStore::default();
-    credentials::save_store(&store, &resolved_path, &password)
-        .map_err(|e| RemotelyError::CryptoOrSerial(e.to_string()))?;
+    credentials::save_store(&store, &resolved_path, &password)?;
+
+    // Cache the master password securely in ~/.remotely/master.key
+    super::save_master_password(&password)?;
 
     println!("\nSuccessfully initialized empty credential store at: {}", resolved_path.display());
-    println!("IMPORTANT: Set the REMOTELY_KEY environment variable to bypass future password prompts.");
-    println!("Example: export REMOTELY_KEY=\"your-password\"");
+    println!("✔ Master password cached locally in ~/.remotely/master.key (owner-only permissions).");
+    println!("✔ Future remotely commands will run automatically without asking for a password.");
 
     Ok(())
 }
