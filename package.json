@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Secure remote device management CLI for SSH & Telnet, optimized for AI agents and developer workflows",
   "bin": {
-    "teleprompt": "./bin/index.js"
+    "teleprompt": "bin/index.js"
   },
   "scripts": {
     "install": "node scripts/install.js"
