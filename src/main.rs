@@ -49,6 +49,10 @@ fn run_app(args: Cli) -> Result<i32, TelepromptError> {
             commands::test::run(db_path, &name, timeout)?;
             Ok(0)
         }
+        Some(Commands::InstallSkill) => {
+            commands::install_skill::run()?;
+            Ok(0)
+        }
         Some(Commands::External(ext_args)) => {
             if ext_args.is_empty() {
                 // Should not happen with Clap subcommands, but handle safely

@@ -13,6 +13,80 @@ pub enum ConnectionType {
     Telnet,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OsType {
+    Linux,
+    Windows,
+    RouterOs,
+    CiscoIos,
+    JunOs,
+    Generic,
+}
+
+impl Default for OsType {
+    fn default() -> Self {
+        OsType::Generic
+    }
+}
+
+impl std::fmt::Display for OsType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            OsType::Linux => "Linux",
+            OsType::Windows => "Windows",
+            OsType::RouterOs => "RouterOS (MikroTik)",
+            OsType::CiscoIos => "Cisco IOS",
+            OsType::JunOs => "JunOS",
+            OsType::Generic => "Generic/Other",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl OsType {
+    pub fn prompt_selection(current: Option<OsType>) -> Result<Self, TelepromptError> {
+        println!("Select Operating System:");
+        println!("1) Linux");
+        println!("2) Windows");
+        println!("3) RouterOS (MikroTik)");
+        println!("4) Cisco IOS");
+        println!("5) JunOS");
+        println!("6) Generic/Other");
+
+        let default_val = match current {
+            Some(OsType::Linux) => "1",
+            Some(OsType::Windows) => "2",
+            Some(OsType::RouterOs) => "3",
+            Some(OsType::CiscoIos) => "4",
+            Some(OsType::JunOs) => "5",
+            None | Some(OsType::Generic) => "6",
+        };
+
+        loop {
+            print!("Enter choice (1-6) [{}]: ", default_val);
+            std::io::stdout().flush().map_err(TelepromptError::Io)?;
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).map_err(TelepromptError::Io)?;
+            let input = input.trim();
+            let selected = if input.is_empty() {
+                default_val
+            } else {
+                input
+            };
+
+            match selected {
+                "1" => return Ok(OsType::Linux),
+                "2" => return Ok(OsType::Windows),
+                "3" => return Ok(OsType::RouterOs),
+                "4" => return Ok(OsType::CiscoIos),
+                "5" => return Ok(OsType::JunOs),
+                "6" => return Ok(OsType::Generic),
+                _ => println!("Invalid choice. Please select a number from 1 to 6."),
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct Device {
     pub name: String,
@@ -27,6 +101,9 @@ pub struct Device {
     pub sudo_capable: bool,
     #[zeroize(skip)]
     pub sudo_password_required: bool,
+    #[zeroize(skip)]
+    #[serde(default)]
+    pub os_type: OsType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -117,6 +194,7 @@ mod tests {
             connection_type: ConnectionType::Ssh,
             sudo_capable: true,
             sudo_password_required: true,
+            os_type: OsType::Linux,
         };
         
         store.devices.insert(dev1.name.clone(), dev1.clone());
@@ -128,6 +206,7 @@ mod tests {
         let loaded_dev = loaded_store.devices.get("test_srv").unwrap();
         assert_eq!(loaded_dev.host, "192.168.1.50");
         assert_eq!(loaded_dev.password.as_deref(), Some("admin123"));
+        assert_eq!(loaded_dev.os_type, OsType::Linux);
 
         // 4. Delete file
         let _ = fs::remove_file(&db_path);
@@ -155,6 +234,7 @@ mod tests {
             connection_type: ConnectionType::Ssh,
             sudo_capable: false,
             sudo_password_required: false,
+            os_type: OsType::Linux,
         };
         store.devices.insert(dev.name.clone(), dev);
         
@@ -221,6 +301,7 @@ mod tests {
             connection_type: ConnectionType::Ssh,
             sudo_capable: true,
             sudo_password_required: true,
+            os_type: OsType::Linux,
         };
 
         let telnet_dev = Device {
@@ -233,6 +314,7 @@ mod tests {
             connection_type: ConnectionType::Telnet,
             sudo_capable: false,
             sudo_password_required: false,
+            os_type: OsType::RouterOs,
         };
 
         store.devices.insert(ssh_dev.name.clone(), ssh_dev.clone());
@@ -247,11 +329,13 @@ mod tests {
         assert_eq!(loaded_ssh.connection_type, ConnectionType::Ssh);
         assert_eq!(loaded_ssh.key_path.as_deref(), Some("/path/to/key"));
         assert!(loaded_ssh.sudo_capable);
+        assert_eq!(loaded_ssh.os_type, OsType::Linux);
 
         let loaded_telnet = loaded.devices.get("telnet_device").expect("Missing telnet device");
         assert_eq!(loaded_telnet.connection_type, ConnectionType::Telnet);
         assert_eq!(loaded_telnet.password, None);
         assert!(!loaded_telnet.sudo_capable);
+        assert_eq!(loaded_telnet.os_type, OsType::RouterOs);
 
         let _ = fs::remove_file(&db_path);
     }

@@ -5,6 +5,7 @@ pub mod edit;
 pub mod list;
 pub mod test;
 pub mod exec;
+pub mod install_skill;
 
 use std::io::Write;
 

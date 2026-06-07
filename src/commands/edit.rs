@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::commands::get_master_password;
-use crate::credentials::{self, ConnectionType};
+use crate::credentials::{self, ConnectionType, OsType};
 use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
@@ -100,7 +100,13 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
         }
     }
 
-    let credentials_changed = host_changed || type_changed || port_changed || username_changed || auth_changed;
+    // 6. OS Type
+    println!();
+    let os_type = OsType::prompt_selection(Some(device.os_type))?;
+    let os_type_changed = os_type != device.os_type;
+    device.os_type = os_type;
+
+    let credentials_changed = host_changed || type_changed || port_changed || username_changed || auth_changed || os_type_changed;
 
     if credentials_changed {
         println!("\nTesting updated connection details...");

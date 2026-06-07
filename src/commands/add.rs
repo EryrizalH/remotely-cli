@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::commands::get_master_password;
-use crate::credentials::{self, ConnectionType, Device};
+use crate::credentials::{self, ConnectionType, Device, OsType};
 use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
@@ -105,6 +105,9 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
         }
     }
 
+    // 6. OS Type Selection
+    let os_type = OsType::prompt_selection(None)?;
+
     let mut device = Device {
         name: name.clone(),
         host,
@@ -115,6 +118,7 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
         connection_type: connection_type.clone(),
         sudo_capable: false,
         sudo_password_required: false,
+        os_type,
     };
 
     // 7. Test connection and detect sudo

@@ -50,6 +50,10 @@ pub enum Commands {
         name: String,
     },
 
+    /// Install AI Agent instructions (SKILL.md) to the current directory
+    #[command(name = "install-skill")]
+    InstallSkill,
+
     // Catch-all for executing commands on a device
     // E.g. `teleprompt deviceA ls -la`
     #[command(external_subcommand)]
