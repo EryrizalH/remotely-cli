@@ -22,6 +22,7 @@ Teleprompt CLI allows developers and AI agents to connect to and execute command
 * **Bypass Interactive Prompts**: Load the `TELEPROMPT_KEY` environment variable in your automation or AI agent context to retrieve credentials and execute commands without interactive password prompts.
 * **Automatic Sudo Password Injection**: Detects remote `sudo` prompts automatically and securely injects the sudo password to prevent script hangs.
 * **SSH and Telnet Support**: Connect to modern SSH servers (passwords or private keys) and legacy Telnet systems.
+* **OS-Aware Environment Detection**: Configure the target OS Type (Linux, Windows, RouterOS, Cisco IOS, JunOS) to allow AI agents or scripts to adapt their command syntax automatically.
 * **Optimized for Automation and AI Agents**: Separation of stdout/stderr and clean exit code forwarding make it easy to parse outcomes programmatically.
 
 ---
@@ -98,6 +99,7 @@ teleprompt <device-name> "cd /var/log && cat syslog | tail -n 20"
 | `teleprompt remove <name>` | Delete a device configuration. |
 | `teleprompt edit <name>` | Interactively modify a device configuration. |
 | `teleprompt test <name>` | Test connectivity and credential validation. |
+| `teleprompt install-skill` | Copy the AI Agent instructions (`TELEPROMPT_SKILL.md`) to the current directory. |
 | `teleprompt <name> <command...>` | Run a command on the remote device. |
 
 ### Global Options
@@ -125,11 +127,20 @@ When running remote commands, Teleprompt monitors stream outputs. If it detects 
 
 ## AI Agent Integration Guidelines
 
-If you are equipping an AI agent (such as Claude Code, ChatGPT, or Gemini) with this tool, add the following to its system instructions:
+If you are equipping an AI agent (such as Claude Code, ChatGPT, or Gemini) with this tool, you can install the agent-specific instructions (`TELEPROMPT_SKILL.md`) in your workspace automatically by running:
+
+```bash
+teleprompt install-skill
+```
+
+This will create `TELEPROMPT_SKILL.md` in the current directory, which instructs the AI agent on how to:
+- Detect the target operating system using `teleprompt list`.
+- Adapt its command syntax based on the OS Type (Linux, Windows, RouterOS, Cisco IOS, JunOS).
+- Run commands securely and process stdout/stderr and exit codes programmatically.
 
 > [!TIP]
-> **AI Agent Instructions for `teleprompt` usage:**
-> - To check configured servers, run `teleprompt list`.
+> **Quick AI Agent Tips:**
+> - To check configured servers and their OS types, run `teleprompt list`.
 > - Ensure the `TELEPROMPT_KEY` environment variable is loaded in your execution context before running commands.
 > - When running commands with pipes (`|`), redirects (`>`), or multiple instructions, group them in a single string, e.g., `teleprompt server-name "command1 && command2 | grep foo"`.
 > - Check exit codes: a non-zero exit code represents a remote command failure or connection loss.

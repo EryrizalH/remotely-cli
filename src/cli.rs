@@ -5,7 +5,7 @@ use std::ffi::OsString;
 #[command(
     name = "teleprompt",
     about = "Secure remote device management CLI for AI agents",
-    version = "0.1.0",
+    version = env!("CARGO_PKG_VERSION"),
     allow_external_subcommands = true
 )]
 pub struct Cli {
