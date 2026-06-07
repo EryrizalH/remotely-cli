@@ -99,4 +99,47 @@ mod tests {
         let result = decrypt(&encrypted, wrong_password);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_decrypt_invalid_payload_length() {
+        let result = decrypt(&[0u8; 10], "password");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Invalid payload length: too short");
+    }
+
+    #[test]
+    fn test_salt_nonce_uniqueness() {
+        let password = "some_password";
+        let plaintext = b"identical data";
+        
+        let enc1 = encrypt(plaintext, password).expect("Encryption 1 failed");
+        let enc2 = encrypt(plaintext, password).expect("Encryption 2 failed");
+        
+        // They must not be identical since salt and nonce are random
+        assert_ne!(enc1, enc2);
+        
+        // Both must decrypt correctly to the same plaintext
+        assert_eq!(decrypt(&enc1, password).unwrap(), plaintext);
+        assert_eq!(decrypt(&enc2, password).unwrap(), plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_empty_password() {
+        let password = "";
+        let plaintext = b"some data";
+        
+        let encrypted = encrypt(plaintext, password).expect("Encryption failed");
+        let decrypted = decrypt(&encrypted, password).expect("Decryption failed");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_special_chars_password() {
+        let password = "🔒🔑 master 🌐 password 123!@#";
+        let plaintext = b"some sensitive information";
+        
+        let encrypted = encrypt(plaintext, password).expect("Encryption failed");
+        let decrypted = decrypt(&encrypted, password).expect("Decryption failed");
+        assert_eq!(decrypted, plaintext);
+    }
 }

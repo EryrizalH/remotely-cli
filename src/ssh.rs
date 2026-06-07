@@ -264,3 +264,46 @@ fn clean_sudo_output(stdout: Vec<u8>, password: &str) -> Vec<u8> {
     
     filtered_lines.join("\n").into_bytes()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_contains_sudo_prompt() {
+        assert!(contains_sudo_prompt("[sudo] password for user:"));
+        assert!(contains_sudo_prompt("password:"));
+        assert!(contains_sudo_prompt("Password for root:"));
+        assert!(!contains_sudo_prompt("access granted"));
+        assert!(!contains_sudo_prompt(""));
+    }
+
+    #[test]
+    fn test_count_sudo_prompts() {
+        assert_eq!(count_sudo_prompts("[sudo] password for user:"), 2); // Matches [sudo] and password for
+        assert_eq!(count_sudo_prompts("password:"), 1);
+        assert_eq!(count_sudo_prompts("[sudo]\npassword:"), 2);
+        assert_eq!(count_sudo_prompts("normal command output"), 0);
+    }
+
+    #[test]
+    fn test_clean_sudo_output() {
+        let password = "my_password";
+        
+        // Output from command with sudo prompting
+        let raw_output = b"[sudo] password for admin:\n\nmy_password\nHello World\nSuccess".to_vec();
+        let cleaned = clean_sudo_output(raw_output, password);
+        assert_eq!(String::from_utf8_lossy(&cleaned), "Hello World\nSuccess");
+
+        // Without password prompting (no [sudo] in prompt or password matches)
+        let raw_output_normal = b"Hello World\nSuccess".to_vec();
+        let cleaned_normal = clean_sudo_output(raw_output_normal, password);
+        assert_eq!(String::from_utf8_lossy(&cleaned_normal), "Hello World\nSuccess");
+
+        // Only sudo prompt and password echo, empty actual output
+        let raw_output_empty = b"[sudo] password for admin:\nmy_password\n".to_vec();
+        let cleaned_empty = clean_sudo_output(raw_output_empty, password);
+        assert_eq!(String::from_utf8_lossy(&cleaned_empty), "");
+    }
+}
+

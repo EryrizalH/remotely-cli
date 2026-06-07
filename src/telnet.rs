@@ -270,3 +270,37 @@ fn handle_telnet_options(stream: &mut TcpStream, data: &[u8]) -> Result<Vec<u8>,
 
     Ok(clean_data)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ends_with_any_prompt() {
+        let prompts = &["$", "#", ">"];
+        assert!(ends_with_any_prompt("user@host:~$", prompts));
+        assert!(ends_with_any_prompt("root@host:~# ", prompts)); // trailing whitespace trimmed
+        assert!(ends_with_any_prompt("router>", prompts));
+        assert!(!ends_with_any_prompt("normal text", prompts));
+        assert!(!ends_with_any_prompt("", prompts));
+    }
+
+    #[test]
+    fn test_contains_sudo_prompt() {
+        assert!(contains_sudo_prompt("[sudo] password for admin:"));
+        assert!(contains_sudo_prompt("password:"));
+        assert!(contains_sudo_prompt("Password:"));
+        assert!(!contains_sudo_prompt("normal prompt $"));
+    }
+
+    #[test]
+    fn test_clean_newlines() {
+        let input = b"line1\r\nline2\r\nline3\r".to_vec();
+        let expected = b"line1\nline2\nline3\r".to_vec();
+        assert_eq!(clean_newlines(input), expected);
+
+        let input_no_cr = b"line1\nline2\n".to_vec();
+        assert_eq!(clean_newlines(input_no_cr.clone()), input_no_cr);
+    }
+}
+

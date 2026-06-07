@@ -132,4 +132,127 @@ mod tests {
         // 4. Delete file
         let _ = fs::remove_file(&db_path);
     }
+
+    #[test]
+    fn test_load_store_invalid_password() {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join("teleprompt_test_invalid_pwd_db.enc");
+        if db_path.exists() {
+            let _ = fs::remove_file(&db_path);
+        }
+
+        let password = "correct_password";
+        let wrong_password = "wrong_password";
+
+        let mut store = CredentialStore::default();
+        let dev = Device {
+            name: "test_srv".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 22,
+            username: "admin".to_string(),
+            password: Some("admin123".to_string()),
+            key_path: None,
+            connection_type: ConnectionType::Ssh,
+            sudo_capable: false,
+            sudo_password_required: false,
+        };
+        store.devices.insert(dev.name.clone(), dev);
+        
+        save_store(&store, &db_path, password).expect("Failed to save store");
+
+        // Loading with wrong password should fail with InvalidPassword
+        let load_res = load_store(&db_path, wrong_password);
+        assert!(load_res.is_err());
+        match load_res.unwrap_err() {
+            TelepromptError::InvalidPassword => {}
+            other => panic!("Expected TelepromptError::InvalidPassword, got: {:?}", other),
+        }
+
+        let _ = fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_load_store_corrupted_data() {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join("teleprompt_test_corrupt_db.enc");
+        if db_path.exists() {
+            let _ = fs::remove_file(&db_path);
+        }
+        
+        // Write corrupt/invalid non-crypto data (too short)
+        fs::write(&db_path, b"too_short").expect("Failed to write corrupt data");
+        let load_res = load_store(&db_path, "password");
+        assert!(load_res.is_err());
+        match load_res.unwrap_err() {
+            TelepromptError::InvalidPassword => {}
+            other => panic!("Expected TelepromptError::InvalidPassword, got: {:?}", other),
+        }
+
+        // Write corrupt but long enough non-crypto data
+        fs::write(&db_path, vec![0u8; 100]).expect("Failed to write corrupt data");
+        let load_res = load_store(&db_path, "password");
+        assert!(load_res.is_err());
+        match load_res.unwrap_err() {
+            TelepromptError::InvalidPassword => {}
+            other => panic!("Expected TelepromptError::InvalidPassword, got: {:?}", other),
+        }
+
+        let _ = fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_store_multiple_devices_and_types() {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join("teleprompt_test_multi_db.enc");
+        if db_path.exists() {
+            let _ = fs::remove_file(&db_path);
+        }
+
+        let password = "pwd";
+        let mut store = CredentialStore::default();
+
+        let ssh_dev = Device {
+            name: "ssh_device".to_string(),
+            host: "192.168.1.10".to_string(),
+            port: 22,
+            username: "ssh_user".to_string(),
+            password: Some("ssh_pass".to_string()),
+            key_path: Some("/path/to/key".to_string()),
+            connection_type: ConnectionType::Ssh,
+            sudo_capable: true,
+            sudo_password_required: true,
+        };
+
+        let telnet_dev = Device {
+            name: "telnet_device".to_string(),
+            host: "192.168.1.20".to_string(),
+            port: 23,
+            username: "telnet_user".to_string(),
+            password: None,
+            key_path: None,
+            connection_type: ConnectionType::Telnet,
+            sudo_capable: false,
+            sudo_password_required: false,
+        };
+
+        store.devices.insert(ssh_dev.name.clone(), ssh_dev.clone());
+        store.devices.insert(telnet_dev.name.clone(), telnet_dev.clone());
+
+        save_store(&store, &db_path, password).expect("Failed to save store");
+
+        let loaded = load_store(&db_path, password).expect("Failed to load store");
+        assert_eq!(loaded.devices.len(), 2);
+        
+        let loaded_ssh = loaded.devices.get("ssh_device").expect("Missing ssh device");
+        assert_eq!(loaded_ssh.connection_type, ConnectionType::Ssh);
+        assert_eq!(loaded_ssh.key_path.as_deref(), Some("/path/to/key"));
+        assert!(loaded_ssh.sudo_capable);
+
+        let loaded_telnet = loaded.devices.get("telnet_device").expect("Missing telnet device");
+        assert_eq!(loaded_telnet.connection_type, ConnectionType::Telnet);
+        assert_eq!(loaded_telnet.password, None);
+        assert!(!loaded_telnet.sudo_capable);
+
+        let _ = fs::remove_file(&db_path);
+    }
 }
