@@ -24,7 +24,7 @@ pub fn run(db_path: Option<&Path>) -> Result<(), TelepromptError> {
     }
 
     let mut table = Table::new();
-    table.set_header(vec!["Device Name", "Host / IP", "Port", "User", "Type", "Sudo Access"]);
+    table.set_header(vec!["Device Name", "Host / IP", "Port", "User", "Type", "OS Type", "Sudo Access"]);
 
     // Sort devices by name for consistent output
     let mut sorted_keys: Vec<&String> = store.devices.keys().collect();
@@ -47,12 +47,15 @@ pub fn run(db_path: Option<&Path>) -> Result<(), TelepromptError> {
             "No"
         };
 
+        let os_str = dev.os_type.to_string();
+
         table.add_row(vec![
             &dev.name,
             &dev.host,
             &dev.port.to_string(),
             &dev.username,
             conn_type_str,
+            &os_str,
             sudo_str,
         ]);
     }
