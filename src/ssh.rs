@@ -69,6 +69,8 @@ pub fn execute_command(
         SudoState::Disabled
     };
 
+    let mut initial_prompts = 0;
+
     while !stdout_closed || !stderr_closed {
         if start_time.elapsed() > timeout {
             return Err(TelepromptError::Timeout(timeout_secs));
@@ -87,6 +89,7 @@ pub fn execute_command(
                         let stdout_str = String::from_utf8_lossy(&stdout);
                         if contains_sudo_prompt(&stdout_str) {
                             if let Some(ref pwd) = device.password {
+                                initial_prompts = count_sudo_prompts(&stdout_str);
                                 // Write password to stdin
                                 sess.set_blocking(true);
                                 if let Err(e) = channel.write_all(format!("{}\n", pwd).as_bytes()) {
@@ -103,7 +106,7 @@ pub fn execute_command(
                         // Check if password prompt appears again (implies incorrect password)
                         let stdout_str = String::from_utf8_lossy(&stdout);
                         // Find the prompt after the first password sent
-                        if count_sudo_prompts(&stdout_str) > 1 {
+                        if count_sudo_prompts(&stdout_str) > initial_prompts {
                             return Err(TelepromptError::SudoFailed("Incorrect password".to_string()));
                         }
                     }
