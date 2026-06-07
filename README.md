@@ -12,6 +12,12 @@ A secure, agent-friendly remote execution and connection manager for SSH and Tel
 
 ---
 
+> [!WARNING]
+> **DO NOT use Teleprompt CLI in "Yolo mode" (fully autonomous mode without human confirmation/supervision) on AI agents.**
+> The author/maintainer assumes no responsibility for any operating system damage, data loss, or misconfigurations caused by the execution of AI agents. Always verify agent actions in a sandbox or require explicit human approval before execution.
+
+---
+
 Teleprompt CLI allows developers and AI agents to connect to and execute commands on remote servers, switches, and other devices via SSH or Telnet. It stores credentials locally in an encrypted database, keeping passwords and private keys secure and preventing them from leaking into shell histories or LLM context prompts.
 
 ---
@@ -137,6 +143,10 @@ This will create `TELEPROMPT_SKILL.md` in the current directory, which instructs
 - Detect the target operating system using `teleprompt list`.
 - Adapt its command syntax based on the OS Type (Linux, Windows, RouterOS, Cisco IOS, JunOS).
 - Run commands securely and process stdout/stderr and exit codes programmatically.
+
+> [!WARNING]
+> **Disclaimer on AI Agent Execution:**
+> Never allow AI agents to run commands in fully autonomous "Yolo mode" without human supervision and explicit approval. The author/maintainer of Teleprompt CLI is not responsible for any system damage, configuration issues, or data loss resulting from commands executed by AI agents.
 
 > [!TIP]
 > **Quick AI Agent Tips:**

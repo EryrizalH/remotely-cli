@@ -2,6 +2,10 @@
 
 Learn how to use the `teleprompt` CLI tool to run shell commands on remote servers and routers securely without exposing passwords or private keys.
 
+> [!WARNING]
+> **DO NOT USE YOLO MODE:**
+> You are strictly forbidden from executing commands on remote servers or systems via `teleprompt` in fully autonomous "Yolo mode" without seeking human confirmation/approval first. Always display the exact command you are about to run and wait for explicit human approval. The author/maintainer of Teleprompt CLI is not responsible for any operating system damage, data loss, or misconfigurations caused by commands you execute.
+
 ## When to use `teleprompt`
 Use this tool whenever you need to execute shell commands, retrieve system status, or automate operations on a remote device (via SSH or Telnet) registered in the credential store.
 
@@ -9,6 +13,7 @@ Use this tool whenever you need to execute shell commands, retrieve system statu
 1. **Never Output Passwords**: When using `teleprompt`, passwords and credentials are kept encrypted on disk. You do not need to read, write, or prompt for device passwords.
 2. **Master Key**: To execute commands without interactive prompts, ensure the `TELEPROMPT_KEY` environment variable is set. If it is not set, commands will fail or wait for human input, which will cause your execution to hang.
 3. **Execution exit codes**: The exit code returned by `teleprompt <device> <command>` matches the remote process's exit code. Always check the exit code to determine if your remote command succeeded.
+4. **No Yolo Mode (Mandatory)**: Do NOT execute commands in "Yolo mode" (fully autonomous mode without human approval/supervision). You must present the command to the user for confirmation before executing it. The author/maintainer is not responsible for any OS damage, data loss, or system instability caused by AI agent execution.
 
 ## Operating System (OS) Awareness
 
