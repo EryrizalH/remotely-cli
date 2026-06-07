@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
 use crate::credentials::{Device, ConnectionType};
-use crate::error::RemotelyError;
+use crate::error::TelepromptError;
 
 // Telnet Command Codes (RFC 854)
 const IAC: u8 = 255;
@@ -18,21 +18,21 @@ pub fn execute_command(
     device: &Device,
     command: &str,
     timeout_secs: u64,
-) -> Result<(i32, Vec<u8>, Vec<u8>), RemotelyError> {
+) -> Result<(i32, Vec<u8>, Vec<u8>), TelepromptError> {
     if device.connection_type != ConnectionType::Telnet {
-        return Err(RemotelyError::Other("Device is not configured for Telnet".to_string()));
+        return Err(TelepromptError::Other("Device is not configured for Telnet".to_string()));
     }
 
     let addr = format!("{}:{}", device.host, device.port);
     let mut stream = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
+        &addr.parse().map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
         Duration::from_secs(timeout_secs),
-    ).map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 
     stream.set_read_timeout(Some(Duration::from_secs(timeout_secs)))
-        .map_err(|e| RemotelyError::Io(e))?;
+        .map_err(|e| TelepromptError::Io(e))?;
     stream.set_write_timeout(Some(Duration::from_secs(timeout_secs)))
-        .map_err(|e| RemotelyError::Io(e))?;
+        .map_err(|e| TelepromptError::Io(e))?;
 
     let start_time = Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
@@ -46,16 +46,16 @@ pub fn execute_command(
     
     // Send username
     stream.write_all(format!("{}\r\n", username).as_bytes())
-        .map_err(|e| RemotelyError::Io(e))?;
-    stream.flush().map_err(|e| RemotelyError::Io(e))?;
+        .map_err(|e| TelepromptError::Io(e))?;
+    stream.flush().map_err(|e| TelepromptError::Io(e))?;
 
     // 2. Read password prompt
     wait_for_prompts(&mut stream, &mut buffer, &["password:"], start_time, timeout)?;
 
     // Send password
     stream.write_all(format!("{}\r\n", password).as_bytes())
-        .map_err(|e| RemotelyError::Io(e))?;
-    stream.flush().map_err(|e| RemotelyError::Io(e))?;
+        .map_err(|e| TelepromptError::Io(e))?;
+    stream.flush().map_err(|e| TelepromptError::Io(e))?;
 
     // 3. Wait for shell prompt to confirm login
     // Common prompt suffixes: "$", "#", ">"
@@ -68,8 +68,8 @@ pub fn execute_command(
     // 4. Send command
     let is_sudo = command.trim().starts_with("sudo ") || command.trim() == "sudo";
     stream.write_all(format!("{}\r\n", command).as_bytes())
-        .map_err(|e| RemotelyError::Io(e))?;
-    stream.flush().map_err(|e| RemotelyError::Io(e))?;
+        .map_err(|e| TelepromptError::Io(e))?;
+    stream.flush().map_err(|e| TelepromptError::Io(e))?;
 
     // 5. Read output
     let mut command_output = Vec::new();
@@ -77,7 +77,7 @@ pub fn execute_command(
 
     loop {
         if start_time.elapsed() > timeout {
-            return Err(RemotelyError::Timeout(timeout_secs));
+            return Err(TelepromptError::Timeout(timeout_secs));
         }
 
         let mut temp_buf = [0u8; 1024];
@@ -88,7 +88,7 @@ pub fn execute_command(
                 std::thread::sleep(Duration::from_millis(10));
                 continue;
             }
-            Err(e) => return Err(RemotelyError::Io(e)),
+            Err(e) => return Err(TelepromptError::Io(e)),
         };
 
         // Negotiate telnet options and extract raw text
@@ -101,8 +101,8 @@ pub fn execute_command(
         if is_sudo && !sudo_prompt_handled && device.sudo_password_required {
             if contains_sudo_prompt(&output_str) {
                 stream.write_all(format!("{}\r\n", password).as_bytes())
-                    .map_err(|e| RemotelyError::Io(e))?;
-                stream.flush().map_err(|e| RemotelyError::Io(e))?;
+                    .map_err(|e| TelepromptError::Io(e))?;
+                stream.flush().map_err(|e| TelepromptError::Io(e))?;
                 sudo_prompt_handled = true;
                 // Clear the output buffer to remove the prompt and password echo
                 command_output.clear();
@@ -135,13 +135,13 @@ pub fn execute_command(
     Ok((0, cleaned_output, Vec::new()))
 }
 
-pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), RemotelyError> {
+pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), TelepromptError> {
     // A connection test for telnet logs in and waits for the prompt
-    let (code, _, _) = execute_command(device, "echo 'remotely_ok'", timeout_secs)?;
+    let (code, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs)?;
     if code == 0 {
         Ok(())
     } else {
-        Err(RemotelyError::Other("Failed to execute test command over Telnet".to_string()))
+        Err(TelepromptError::Other("Failed to execute test command over Telnet".to_string()))
     }
 }
 
@@ -151,10 +151,10 @@ fn wait_for_prompts(
     prompts: &[&str],
     start_time: Instant,
     timeout: Duration,
-) -> Result<(String, usize), RemotelyError> {
+) -> Result<(String, usize), TelepromptError> {
     loop {
         if start_time.elapsed() > timeout {
-            return Err(RemotelyError::Timeout(timeout.as_secs()));
+            return Err(TelepromptError::Timeout(timeout.as_secs()));
         }
 
         // Check if we already have one of the prompts in the buffer
@@ -167,7 +167,7 @@ fn wait_for_prompts(
 
         let mut temp_buf = [0u8; 1024];
         match stream.read(&mut temp_buf) {
-            Ok(0) => return Err(RemotelyError::ConnectionFailed("".to_string(), "Connection closed by remote host".to_string())),
+            Ok(0) => return Err(TelepromptError::ConnectionFailed("".to_string(), "Connection closed by remote host".to_string())),
             Ok(n) => {
                 let raw_bytes = handle_telnet_options(stream, &temp_buf[..n])?;
                 buffer.extend_from_slice(&raw_bytes);
@@ -175,7 +175,7 @@ fn wait_for_prompts(
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(Duration::from_millis(10));
             }
-            Err(e) => return Err(RemotelyError::Io(e)),
+            Err(e) => return Err(TelepromptError::Io(e)),
         }
     }
 }

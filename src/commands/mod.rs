@@ -8,15 +8,15 @@ pub mod exec;
 
 use std::io::Write;
 
-pub fn get_master_key_path() -> Result<std::path::PathBuf, crate::error::RemotelyError> {
+pub fn get_master_key_path() -> Result<std::path::PathBuf, crate::error::TelepromptError> {
     let home_dir = dirs::home_dir()
-        .ok_or_else(|| crate::error::RemotelyError::Other("Could not find home directory".to_string()))?;
-    Ok(home_dir.join(".remotely").join("master.key"))
+        .ok_or_else(|| crate::error::TelepromptError::Other("Could not find home directory".to_string()))?;
+    Ok(home_dir.join(".teleprompt").join("master.key"))
 }
 
 // Helper to get master password from env var, key file, or prompt the user
-pub fn get_master_password() -> Result<String, crate::error::RemotelyError> {
-    if let Ok(pwd) = std::env::var("REMOTELY_KEY") {
+pub fn get_master_password() -> Result<String, crate::error::TelepromptError> {
+    if let Ok(pwd) = std::env::var("TELEPROMPT_KEY") {
         if !pwd.is_empty() {
             return Ok(pwd);
         }
@@ -36,13 +36,13 @@ pub fn get_master_password() -> Result<String, crate::error::RemotelyError> {
 
     // Prompt user
     print!("Enter Master Password: ");
-    std::io::stdout().flush().map_err(|e| crate::error::RemotelyError::Io(e))?;
+    std::io::stdout().flush().map_err(|e| crate::error::TelepromptError::Io(e))?;
     
     let pwd = rpassword::read_password()
-        .map_err(|e| crate::error::RemotelyError::Io(e))?;
+        .map_err(|e| crate::error::TelepromptError::Io(e))?;
     
     if pwd.is_empty() {
-        return Err(crate::error::RemotelyError::InvalidPassword);
+        return Err(crate::error::TelepromptError::InvalidPassword);
     }
     
     Ok(pwd)
@@ -62,14 +62,14 @@ fn set_owner_only_permissions(_path: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn save_master_password(password: &str) -> Result<(), crate::error::RemotelyError> {
+pub fn save_master_password(password: &str) -> Result<(), crate::error::TelepromptError> {
     let key_path = get_master_key_path()?;
     if let Some(parent) = key_path.parent() {
-        std::fs::create_dir_all(parent).map_err(crate::error::RemotelyError::Io)?;
+        std::fs::create_dir_all(parent).map_err(crate::error::TelepromptError::Io)?;
     }
 
     // Write password
-    std::fs::write(&key_path, password).map_err(crate::error::RemotelyError::Io)?;
+    std::fs::write(&key_path, password).map_err(crate::error::TelepromptError::Io)?;
 
     // Set secure permissions
     let _ = set_owner_only_permissions(&key_path);

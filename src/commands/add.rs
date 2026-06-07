@@ -3,17 +3,17 @@ use std::path::Path;
 
 use crate::commands::get_master_password;
 use crate::credentials::{self, ConnectionType, Device};
-use crate::error::RemotelyError;
+use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
-pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), RemotelyError> {
+pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
         None => credentials::get_default_db_path()?,
     };
 
     if !resolved_path.exists() {
-        return Err(RemotelyError::NotInitialized);
+        return Err(TelepromptError::NotInitialized);
     }
 
     let master_pwd = get_master_password()?;
@@ -85,22 +85,22 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), RemotelyErro
                 key_path = Some(kp);
                 // Prompt for password anyway in case key is encrypted or we need password for sudo
                 print!("Sudo/Password (optional, press Enter to skip): ");
-                std::io::stdout().flush().map_err(RemotelyError::Io)?;
-                let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
                 if !pwd.is_empty() {
                     password = Some(pwd);
                 }
             } else {
                 print!("Password: ");
-                std::io::stdout().flush().map_err(RemotelyError::Io)?;
-                let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
                 password = Some(pwd);
             }
         }
         ConnectionType::Telnet => {
             print!("Password: ");
-            std::io::stdout().flush().map_err(RemotelyError::Io)?;
-            let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+            std::io::stdout().flush().map_err(TelepromptError::Io)?;
+            let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
             password = Some(pwd);
         }
     }
@@ -144,9 +144,9 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), RemotelyErro
         Err(e) => {
             println!("✖ Connection failed: {}", e);
             print!("Do you still want to save this device? (y/N): ");
-            std::io::stdout().flush().map_err(RemotelyError::Io)?;
+            std::io::stdout().flush().map_err(TelepromptError::Io)?;
             let mut answer = String::new();
-            std::io::stdin().read_line(&mut answer).map_err(RemotelyError::Io)?;
+            std::io::stdin().read_line(&mut answer).map_err(TelepromptError::Io)?;
             if !answer.trim().eq_ignore_ascii_case("y") {
                 println!("Device not saved.");
                 return Ok(());
@@ -162,11 +162,11 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), RemotelyErro
     Ok(())
 }
 
-fn prompt_input(label: &str, default: Option<&str>) -> Result<String, RemotelyError> {
+fn prompt_input(label: &str, default: Option<&str>) -> Result<String, TelepromptError> {
     print!("{}: ", label);
-    std::io::stdout().flush().map_err(RemotelyError::Io)?;
+    std::io::stdout().flush().map_err(TelepromptError::Io)?;
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input).map_err(RemotelyError::Io)?;
+    std::io::stdin().read_line(&mut input).map_err(TelepromptError::Io)?;
     let input = input.trim();
     if input.is_empty() {
         if let Some(def) = default {

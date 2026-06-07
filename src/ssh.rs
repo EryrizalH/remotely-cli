@@ -5,47 +5,47 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use crate::credentials::{Device, ConnectionType};
-use crate::error::RemotelyError;
+use crate::error::TelepromptError;
 
 pub fn execute_command(
     device: &Device,
     command: &str,
     timeout_secs: u64,
-) -> Result<(i32, Vec<u8>, Vec<u8>), RemotelyError> {
+) -> Result<(i32, Vec<u8>, Vec<u8>), TelepromptError> {
     if device.connection_type != ConnectionType::Ssh {
-        return Err(RemotelyError::Other("Device is not configured for SSH".to_string()));
+        return Err(TelepromptError::Other("Device is not configured for SSH".to_string()));
     }
 
     // Connect to host
     let addr = format!("{}:{}", device.host, device.port);
     let stream = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
+        &addr.parse().map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
         Duration::from_secs(timeout_secs),
-    ).map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 
     let mut sess = Session::new()
-        .map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), e.to_string()))?;
+        .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
     sess.set_tcp_stream(stream);
     sess.set_timeout(timeout_secs as u32 * 1000);
     sess.handshake()
-        .map_err(|e| RemotelyError::ConnectionFailed(addr.clone(), e.to_string()))?;
+        .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 
     // Authenticate
     authenticate_session(&mut sess, device, &addr)?;
 
     let mut channel = sess.channel_session()
-        .map_err(|e| RemotelyError::Other(format!("Failed to open channel: {}", e)))?;
+        .map_err(|e| TelepromptError::Other(format!("Failed to open channel: {}", e)))?;
 
     let is_sudo = command.trim().starts_with("sudo ") || command.trim() == "sudo";
     
     if is_sudo {
         // Sudo requires a PTY to receive the password
         channel.request_pty("vanilla", None, None)
-            .map_err(|e| RemotelyError::Other(format!("Failed to request PTY for sudo: {}", e)))?;
+            .map_err(|e| TelepromptError::Other(format!("Failed to request PTY for sudo: {}", e)))?;
     }
 
     channel.exec(command)
-        .map_err(|e| RemotelyError::Other(format!("Failed to execute command: {}", e)))?;
+        .map_err(|e| TelepromptError::Other(format!("Failed to execute command: {}", e)))?;
 
     sess.set_blocking(false);
 
@@ -71,7 +71,7 @@ pub fn execute_command(
 
     while !stdout_closed || !stderr_closed {
         if start_time.elapsed() > timeout {
-            return Err(RemotelyError::Timeout(timeout_secs));
+            return Err(TelepromptError::Timeout(timeout_secs));
         }
 
         // Read stdout
@@ -90,13 +90,13 @@ pub fn execute_command(
                                 // Write password to stdin
                                 sess.set_blocking(true);
                                 if let Err(e) = channel.write_all(format!("{}\n", pwd).as_bytes()) {
-                                    return Err(RemotelyError::SudoFailed(e.to_string()));
+                                    return Err(TelepromptError::SudoFailed(e.to_string()));
                                 }
                                 let _ = channel.flush();
                                 sess.set_blocking(false);
                                 sudo_state = SudoState::PasswordSent;
                             } else {
-                                return Err(RemotelyError::SudoFailed("Sudo requires a password, but none is saved".to_string()));
+                                return Err(TelepromptError::SudoFailed("Sudo requires a password, but none is saved".to_string()));
                             }
                         }
                     } else if let SudoState::PasswordSent = sudo_state {
@@ -104,12 +104,12 @@ pub fn execute_command(
                         let stdout_str = String::from_utf8_lossy(&stdout);
                         // Find the prompt after the first password sent
                         if count_sudo_prompts(&stdout_str) > 1 {
-                            return Err(RemotelyError::SudoFailed("Incorrect password".to_string()));
+                            return Err(TelepromptError::SudoFailed("Incorrect password".to_string()));
                         }
                     }
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => return Err(RemotelyError::Io(e)),
+                Err(e) => return Err(TelepromptError::Io(e)),
             }
         }
 
@@ -120,7 +120,7 @@ pub fn execute_command(
                 Ok(0) => stderr_closed = true,
                 Ok(n) => stderr.extend_from_slice(&buf[..n]),
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => return Err(RemotelyError::Io(e)),
+                Err(e) => return Err(TelepromptError::Io(e)),
             }
         }
 
@@ -133,7 +133,7 @@ pub fn execute_command(
     let _ = channel.wait_close();
 
     let exit_status = channel.exit_status()
-        .map_err(|e| RemotelyError::Other(format!("Failed to retrieve exit status: {}", e)))?;
+        .map_err(|e| TelepromptError::Other(format!("Failed to retrieve exit status: {}", e)))?;
 
     // If PTY was used, remove the password prompt and the echo of the password from stdout to keep it clean
     if is_sudo {
@@ -143,17 +143,17 @@ pub fn execute_command(
     Ok((exit_status, stdout, stderr))
 }
 
-pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), RemotelyError> {
+pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), TelepromptError> {
     // We execute a simple echo command to test connectivity
-    let (status, _, _) = execute_command(device, "echo 'remotely_ok'", timeout_secs)?;
+    let (status, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs)?;
     if status == 0 {
         Ok(())
     } else {
-        Err(RemotelyError::Other(format!("Test command exited with code {}", status)))
+        Err(TelepromptError::Other(format!("Test command exited with code {}", status)))
     }
 }
 
-pub fn detect_sudo_capability(device: &mut Device, timeout_secs: u64) -> Result<(), RemotelyError> {
+pub fn detect_sudo_capability(device: &mut Device, timeout_secs: u64) -> Result<(), TelepromptError> {
     // 1. Check if sudo is installed and if we can run without password
     // We run `sudo -n true`
     let (status_no_pwd, _, _) = execute_command(device, "sudo -n true", timeout_secs)?;
@@ -183,7 +183,7 @@ fn authenticate_session(
     sess: &mut Session,
     device: &Device,
     addr: &str,
-) -> Result<(), RemotelyError> {
+) -> Result<(), TelepromptError> {
     // 1. Try public key if key_path is specified
     if let Some(ref key_path) = device.key_path {
         let path = Path::new(key_path);
@@ -196,23 +196,23 @@ fn authenticate_session(
             ) {
                 // If pubkey failed and no password is saved, return auth error
                 if device.password.is_none() {
-                    return Err(RemotelyError::AuthFailed(device.username.clone(), addr.to_string()));
+                    return Err(TelepromptError::AuthFailed(device.username.clone(), addr.to_string()));
                 }
             } else {
                 return Ok(()); // Key auth succeeded
             }
         } else if device.password.is_none() {
-            return Err(RemotelyError::Other(format!("SSH key file not found at: {}", key_path)));
+            return Err(TelepromptError::Other(format!("SSH key file not found at: {}", key_path)));
         }
     }
 
     // 2. Try password auth
     if let Some(ref password) = device.password {
         sess.userauth_password(&device.username, password)
-            .map_err(|_| RemotelyError::AuthFailed(device.username.clone(), addr.to_string()))?;
+            .map_err(|_| TelepromptError::AuthFailed(device.username.clone(), addr.to_string()))?;
         Ok(())
     } else {
-        Err(RemotelyError::Other("No credentials (password or valid key) provided for SSH auth".to_string()))
+        Err(TelepromptError::Other("No credentials (password or valid key) provided for SSH auth".to_string()))
     }
 }
 

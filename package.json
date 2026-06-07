@@ -1,9 +1,9 @@
 {
-  "name": "remotely-cli",
+  "name": "teleprompt-cli",
   "version": "0.1.0",
   "description": "Secure remote device management CLI for SSH & Telnet, optimized for AI agents and developer workflows",
   "bin": {
-    "remotely": "./bin/index.js"
+    "teleprompt": "./bin/index.js"
   },
   "scripts": {
     "install": "node scripts/install.js"
@@ -16,7 +16,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EryrizalH/remotely-cli.git"
+    "url": "git+https://github.com/EryrizalH/teleprompt-cli.git"
   },
   "keywords": [
     "ssh",
@@ -35,7 +35,7 @@
   "author": "Antigravity",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/EryrizalH/remotely-cli/issues"
+    "url": "https://github.com/EryrizalH/teleprompt-cli/issues"
   },
-  "homepage": "https://github.com/EryrizalH/remotely-cli#readme"
+  "homepage": "https://github.com/EryrizalH/teleprompt-cli#readme"
 }

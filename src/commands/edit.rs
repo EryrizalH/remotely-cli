@@ -3,24 +3,24 @@ use std::path::Path;
 
 use crate::commands::get_master_password;
 use crate::credentials::{self, ConnectionType};
-use crate::error::RemotelyError;
+use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
-pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), RemotelyError> {
+pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
         None => credentials::get_default_db_path()?,
     };
 
     if !resolved_path.exists() {
-        return Err(RemotelyError::NotInitialized);
+        return Err(TelepromptError::NotInitialized);
     }
 
     let master_pwd = get_master_password()?;
     let mut store = credentials::load_store(&resolved_path, &master_pwd)?;
 
     let mut device = store.devices.get(name)
-        .ok_or_else(|| RemotelyError::DeviceNotFound(name.to_string()))?
+        .ok_or_else(|| TelepromptError::DeviceNotFound(name.to_string()))?
         .clone();
 
     println!("--- Edit Device '{}' (Press Enter to keep current value) ---", name);
@@ -71,8 +71,8 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
                 }
                 
                 print!("Update Sudo/Password (optional, press Enter to skip): ");
-                std::io::stdout().flush().map_err(RemotelyError::Io)?;
-                let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
                 if !pwd.is_empty() {
                     device.password = Some(pwd);
                     auth_changed = true;
@@ -80,8 +80,8 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
             } else {
                 device.key_path = None;
                 print!("Update Password (press Enter to keep current): ");
-                std::io::stdout().flush().map_err(RemotelyError::Io)?;
-                let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
                 if !pwd.is_empty() {
                     device.password = Some(pwd);
                     auth_changed = true;
@@ -91,8 +91,8 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
         ConnectionType::Telnet => {
             device.key_path = None;
             print!("Update Password (press Enter to keep current): ");
-            std::io::stdout().flush().map_err(RemotelyError::Io)?;
-            let pwd = rpassword::read_password().map_err(RemotelyError::Io)?;
+            std::io::stdout().flush().map_err(TelepromptError::Io)?;
+            let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
             if !pwd.is_empty() {
                 device.password = Some(pwd);
                 auth_changed = true;
@@ -129,9 +129,9 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
             Err(e) => {
                 println!("✖ Connection test failed: {}", e);
                 print!("Do you still want to save these changes? (y/N): ");
-                std::io::stdout().flush().map_err(RemotelyError::Io)?;
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
                 let mut answer = String::new();
-                std::io::stdin().read_line(&mut answer).map_err(RemotelyError::Io)?;
+                std::io::stdin().read_line(&mut answer).map_err(TelepromptError::Io)?;
                 if !answer.trim().eq_ignore_ascii_case("y") {
                     println!("Changes not saved.");
                     return Ok(());
@@ -148,7 +148,7 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
     Ok(())
 }
 
-fn prompt_input(label: &str, current: Option<&str>) -> Result<String, RemotelyError> {
+fn prompt_input(label: &str, current: Option<&str>) -> Result<String, TelepromptError> {
     if let Some(curr) = current {
         if curr.is_empty() {
             print!("{}: ", label);
@@ -159,9 +159,9 @@ fn prompt_input(label: &str, current: Option<&str>) -> Result<String, RemotelyEr
         print!("{}: ", label);
     }
     
-    std::io::stdout().flush().map_err(RemotelyError::Io)?;
+    std::io::stdout().flush().map_err(TelepromptError::Io)?;
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input).map_err(RemotelyError::Io)?;
+    std::io::stdin().read_line(&mut input).map_err(TelepromptError::Io)?;
     let input = input.trim();
     if input.is_empty() {
         if let Some(curr) = current {

@@ -2,9 +2,9 @@ use clap::Parser;
 use std::path::Path;
 use std::process;
 
-use remotely_cli::cli::{Cli, Commands};
-use remotely_cli::commands;
-use remotely_cli::error::RemotelyError;
+use teleprompt_cli::cli::{Cli, Commands};
+use teleprompt_cli::commands;
+use teleprompt_cli::error::TelepromptError;
 
 fn main() {
     let args = Cli::parse();
@@ -20,7 +20,7 @@ fn main() {
     }
 }
 
-fn run_app(args: Cli) -> Result<i32, RemotelyError> {
+fn run_app(args: Cli) -> Result<i32, TelepromptError> {
     let db_path = args.db_path.as_ref().map(Path::new);
     let timeout = args.timeout;
 
@@ -52,7 +52,7 @@ fn run_app(args: Cli) -> Result<i32, RemotelyError> {
         Some(Commands::External(ext_args)) => {
             if ext_args.is_empty() {
                 // Should not happen with Clap subcommands, but handle safely
-                eprintln!("No device or command specified. Run 'remotely --help' for help.");
+                eprintln!("No device or command specified. Run 'teleprompt --help' for help.");
                 return Ok(1);
             }
 
@@ -65,8 +65,8 @@ fn run_app(args: Cli) -> Result<i32, RemotelyError> {
             let cmd_args = &string_args[1..];
 
             if cmd_args.is_empty() {
-                return Err(RemotelyError::Cli(format!(
-                    "No remote command provided for device '{}'. Usage: remotely {} <command>...",
+                return Err(TelepromptError::Cli(format!(
+                    "No remote command provided for device '{}'. Usage: teleprompt {} <command>...",
                     device_name, device_name
                 )));
             }
@@ -78,7 +78,7 @@ fn run_app(args: Cli) -> Result<i32, RemotelyError> {
             // No subcommand or external arguments passed
             use clap::CommandFactory;
             let mut cmd = Cli::command();
-            cmd.print_help().map_err(|e| RemotelyError::Other(e.to_string()))?;
+            cmd.print_help().map_err(|e| TelepromptError::Other(e.to_string()))?;
             println!(); // Print newline
             Ok(0)
         }

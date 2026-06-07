@@ -5,7 +5,7 @@ const http = require('http');
 const { exec } = require('child_process');
 
 // Configuration
-const REPO = 'EryrizalH/remotely-cli';
+const REPO = 'EryrizalH/teleprompt-cli';
 const packageJson = require('../package.json');
 const VERSION = packageJson.version;
 
@@ -13,25 +13,25 @@ const platform = process.platform;
 const arch = process.arch;
 
 const binDir = path.join(__dirname, '..', 'bin');
-const binaryName = platform === 'win32' ? 'remotely.exe' : 'remotely';
+const binaryName = platform === 'win32' ? 'teleprompt.exe' : 'teleprompt';
 const binaryPath = path.join(binDir, binaryName);
 
 // Map OS & Arch to Release Asset filenames
 const assets = {
   'win32-x64': {
-    name: 'remotely-windows-x64.zip',
+    name: 'teleprompt-windows-x64.zip',
     type: 'zip'
   },
   'darwin-x64': {
-    name: 'remotely-macos-x64.tar.gz',
+    name: 'teleprompt-macos-x64.tar.gz',
     type: 'tar'
   },
   'darwin-arm64': {
-    name: 'remotely-macos-arm64.tar.gz',
+    name: 'teleprompt-macos-arm64.tar.gz',
     type: 'tar'
   },
   'linux-x64': {
-    name: 'remotely-linux-x64.tar.gz',
+    name: 'teleprompt-linux-x64.tar.gz',
     type: 'tar'
   }
 };
@@ -87,7 +87,7 @@ async function main() {
       fs.chmodSync(binaryPath, 0o755);
     }
 
-    console.log(`remotely-cli installed successfully!`);
+    console.log(`teleprompt-cli installed successfully!`);
   } catch (err) {
     console.error(`Failed to download or install precompiled binary: ${err.message}`);
     // Clean up archive if download failed halfway
@@ -161,7 +161,7 @@ function tryBuildFromSource() {
       }
       
       console.log(`Cargo detected: ${stdout.trim()}`);
-      console.log('Compiling remotely-cli from source...');
+      console.log('Compiling teleprompt-cli from source...');
       
       exec('cargo build --release', { cwd: path.join(__dirname, '..') }, (buildErr, buildStdout, buildStderr) => {
         if (buildErr) {
@@ -170,8 +170,8 @@ function tryBuildFromSource() {
         }
         
         const sourceBinary = platform === 'win32' 
-          ? path.join(__dirname, '..', 'target', 'release', 'remotely.exe')
-          : path.join(__dirname, '..', 'target', 'release', 'remotely');
+          ? path.join(__dirname, '..', 'target', 'release', 'teleprompt.exe')
+          : path.join(__dirname, '..', 'target', 'release', 'teleprompt');
           
         if (!fs.existsSync(sourceBinary)) {
           console.error(`Built binary not found at expected path: ${sourceBinary}`);

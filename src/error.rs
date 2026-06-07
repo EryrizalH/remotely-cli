@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum RemotelyError {
+pub enum TelepromptError {
     #[error("Device '{0}' not found in credential store")]
     DeviceNotFound(String),
 
@@ -11,7 +11,7 @@ pub enum RemotelyError {
     #[error("Authentication failed for user '{0}' on '{1}'")]
     AuthFailed(String, String),
 
-    #[error("Credential store not initialized. Run 'remotely init' first.")]
+    #[error("Credential store not initialized. Run 'teleprompt init' first.")]
     NotInitialized,
 
     #[error("Invalid master password or corrupted credential store")]
@@ -39,7 +39,7 @@ pub enum RemotelyError {
     Other(String),
 }
 
-impl RemotelyError {
+impl TelepromptError {
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::DeviceNotFound(_) => 1,

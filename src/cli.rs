@@ -3,7 +3,7 @@ use std::ffi::OsString;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "remotely",
+    name = "teleprompt",
     about = "Secure remote device management CLI for AI agents",
     version = "0.1.0",
     allow_external_subcommands = true
@@ -51,7 +51,7 @@ pub enum Commands {
     },
 
     // Catch-all for executing commands on a device
-    // E.g. `remotely deviceA ls -la`
+    // E.g. `teleprompt deviceA ls -la`
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }

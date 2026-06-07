@@ -19,23 +19,23 @@ jobs:
           - name: Windows x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: remotely.exe
-            archive: remotely-windows-x64.zip
+            bin: teleprompt.exe
+            archive: teleprompt-windows-x64.zip
           - name: macOS Intel
             os: macos-latest
             target: x86_64-apple-darwin
-            bin: remotely
-            archive: remotely-macos-x64.tar.gz
+            bin: teleprompt
+            archive: teleprompt-macos-x64.tar.gz
           - name: macOS Silicon
             os: macos-latest
             target: aarch64-apple-darwin
-            bin: remotely
-            archive: remotely-macos-arm64.tar.gz
+            bin: teleprompt
+            archive: teleprompt-macos-arm64.tar.gz
           - name: Linux x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            bin: remotely
-            archive: remotely-linux-x64.tar.gz
+            bin: teleprompt
+            archive: teleprompt-linux-x64.tar.gz
 
     steps:
       - name: Checkout source code

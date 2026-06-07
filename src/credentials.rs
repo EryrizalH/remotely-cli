@@ -34,18 +34,18 @@ pub struct CredentialStore {
     pub devices: HashMap<String, Device>,
 }
 
-use crate::error::RemotelyError;
+use crate::error::TelepromptError;
 
-/// Returns the default path to the credentials file (~/.remotely/credentials.enc)
-pub fn get_default_db_path() -> Result<PathBuf, RemotelyError> {
+/// Returns the default path to the credentials file (~/.teleprompt/credentials.enc)
+pub fn get_default_db_path() -> Result<PathBuf, TelepromptError> {
     let home_dir = dirs::home_dir()
-        .ok_or_else(|| RemotelyError::Other("Could not find home directory".to_string()))?;
-    Ok(home_dir.join(".remotely").join("credentials.enc"))
+        .ok_or_else(|| TelepromptError::Other("Could not find home directory".to_string()))?;
+    Ok(home_dir.join(".teleprompt").join("credentials.enc"))
 }
 
 /// Loads and decrypts the credential store from the specified path.
 /// If the file does not exist, returns an empty CredentialStore.
-pub fn load_store<P: AsRef<Path>>(path: P, password: &str) -> Result<CredentialStore, RemotelyError> {
+pub fn load_store<P: AsRef<Path>>(path: P, password: &str) -> Result<CredentialStore, TelepromptError> {
     let path = path.as_ref();
     if !path.exists() {
         return Ok(CredentialStore::default());
@@ -53,10 +53,10 @@ pub fn load_store<P: AsRef<Path>>(path: P, password: &str) -> Result<CredentialS
 
     let encrypted_data = fs::read(path)?;
     let decrypted_json = crypto::decrypt(&encrypted_data, password)
-        .map_err(|_e| RemotelyError::InvalidPassword)?;
+        .map_err(|_e| TelepromptError::InvalidPassword)?;
     
     let store: CredentialStore = serde_json::from_slice(&decrypted_json)
-        .map_err(|e| RemotelyError::CryptoOrSerial(e.to_string()))?;
+        .map_err(|e| TelepromptError::CryptoOrSerial(e.to_string()))?;
     Ok(store)
 }
 
@@ -65,7 +65,7 @@ pub fn save_store<P: AsRef<Path>>(
     store: &CredentialStore,
     path: P,
     password: &str,
-) -> Result<(), RemotelyError> {
+) -> Result<(), TelepromptError> {
     let path = path.as_ref();
     
     // Ensure parent directory exists
@@ -74,9 +74,9 @@ pub fn save_store<P: AsRef<Path>>(
     }
 
     let json_bytes = serde_json::to_vec(store)
-        .map_err(|e| RemotelyError::CryptoOrSerial(e.to_string()))?;
+        .map_err(|e| TelepromptError::CryptoOrSerial(e.to_string()))?;
     let encrypted_data = crypto::encrypt(&json_bytes, password)
-        .map_err(|e| RemotelyError::CryptoOrSerial(e.to_string()))?;
+        .map_err(|e| TelepromptError::CryptoOrSerial(e.to_string()))?;
     
     // Write atomically
     let temp_path = path.with_extension("tmp");
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn test_store_crud_operations() {
         let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join("remotely_test_db.enc");
+        let db_path = temp_dir.join("teleprompt_test_db.enc");
         if db_path.exists() {
             let _ = fs::remove_file(&db_path);
         }

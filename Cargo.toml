@@ -1,5 +1,5 @@
 [package]
-name = "remotely-cli"
+name = "teleprompt-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Secure remote device management CLI for AI agents"
@@ -7,7 +7,7 @@ license = "MIT"
 authors = ["Antigravity"]
 
 [[bin]]
-name = "remotely"
+name = "teleprompt"
 path = "src/main.rs"
 
 [dependencies]

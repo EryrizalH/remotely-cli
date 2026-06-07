@@ -4,12 +4,12 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const binaryName = process.platform === 'win32' ? 'remotely.exe' : 'remotely';
+const binaryName = process.platform === 'win32' ? 'teleprompt.exe' : 'teleprompt';
 const binaryPath = path.join(__dirname, binaryName);
 
 if (!fs.existsSync(binaryPath)) {
-  console.error(`Error: remotely binary not found at ${binaryPath}`);
-  console.error('Please try reinstalling this package: npm install -g remotely-cli');
+  console.error(`Error: teleprompt binary not found at ${binaryPath}`);
+  console.error('Please try reinstalling this package: npm install -g teleprompt-cli');
   process.exit(1);
 }
 
