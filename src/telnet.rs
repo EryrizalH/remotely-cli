@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
 use crate::credentials::{Device, ConnectionType};
@@ -24,8 +24,12 @@ pub fn execute_command(
     }
 
     let addr = format!("{}:{}", device.host, device.port);
+    let socket_addrs = addr.to_socket_addrs()
+        .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    let socket_addr = socket_addrs.into_iter().next()
+        .ok_or_else(|| TelepromptError::ConnectionFailed(addr.clone(), "No addresses resolved".to_string()))?;
     let mut stream = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
+        &socket_addr,
         Duration::from_secs(timeout_secs),
     ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 

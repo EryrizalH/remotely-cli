@@ -1,6 +1,6 @@
-use ssh2::Session;
+use ssh2::{Session, KeyboardInteractivePrompt, Prompt};
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -18,8 +18,12 @@ pub fn execute_command(
 
     // Connect to host
     let addr = format!("{}:{}", device.host, device.port);
+    let socket_addrs = addr.to_socket_addrs()
+        .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    let socket_addr = socket_addrs.into_iter().next()
+        .ok_or_else(|| TelepromptError::ConnectionFailed(addr.clone(), "No addresses resolved".to_string()))?;
     let stream = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), format!("{}", e)))?,
+        &socket_addr,
         Duration::from_secs(timeout_secs),
     ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 
@@ -211,9 +215,35 @@ fn authenticate_session(
 
     // 2. Try password auth
     if let Some(ref password) = device.password {
-        sess.userauth_password(&device.username, password)
-            .map_err(|_| TelepromptError::AuthFailed(device.username.clone(), addr.to_string()))?;
-        Ok(())
+        if sess.userauth_password(&device.username, password).is_ok() {
+            return Ok(());
+        }
+
+        // Fallback to keyboard-interactive authentication
+        struct SimplePromptHandler {
+            password: String,
+        }
+
+        impl KeyboardInteractivePrompt for SimplePromptHandler {
+            fn prompt<'a>(
+                &mut self,
+                _username: &str,
+                _instructions: &str,
+                prompts: &[Prompt<'a>],
+            ) -> Vec<String> {
+                prompts.iter().map(|_| self.password.clone()).collect()
+            }
+        }
+
+        let mut prompter = SimplePromptHandler {
+            password: password.clone(),
+        };
+
+        if sess.userauth_keyboard_interactive(&device.username, &mut prompter).is_ok() {
+            return Ok(());
+        }
+
+        Err(TelepromptError::AuthFailed(device.username.clone(), addr.to_string()))
     } else {
         Err(TelepromptError::Other("No credentials (password or valid key) provided for SSH auth".to_string()))
     }
