@@ -24,13 +24,12 @@ Teleprompt CLI allows developers and AI agents to connect to and execute command
 
 ## Key Features
 
-* **Zero-Exposure Credentials**: All device credentials (passwords, private keys) are encrypted locally using AES-256-GCM (Argon2id key derivation) in a local database (`~/.teleprompt/credentials.enc`).
+* **Zero-Exposure Credentials**: All device credentials (passwords, private keys, passphrases) are encrypted locally using AES-256-GCM (Argon2id key derivation) in a local database (`~/.teleprompt/credentials.enc`).
 * **Bypass Interactive Prompts**: Load the `TELEPROMPT_KEY` environment variable in your automation or AI agent context to retrieve credentials and execute commands without interactive password prompts.
+* **Encrypted SSH Key Support**: Use password-protected SSH private keys — Teleprompt now prompts for and securely stores the key passphrase alongside the key path.
+* **Host Key Verification**: Prevents MITM attacks by verifying server host keys against a local `known_hosts` file. Three policies: `Strict`, `AcceptNew` (default), or `Off`.
 * **Automatic Sudo Password Injection**: Detects remote `sudo` prompts automatically and securely injects the sudo password to prevent script hangs.
-* **SSH and Telnet Support**: Connect to modern SSH servers (passwords or private keys) and legacy Telnet systems.
-* **OS-Aware Environment Detection**: Configure the target OS Type (Linux, Windows, RouterOS, Cisco IOS, JunOS) to allow AI agents or scripts to adapt their command syntax automatically.
-* **Optimized for Automation and AI Agents**: Separation of stdout/stderr and clean exit code forwarding make it easy to parse outcomes programmatically.
-
+* **SSH and Telnet Support**: Connect to modern SSH servers (passwords or private keys with optional passphrase) and legacy Telnet systems.
 ---
 
 ## Installation
@@ -110,11 +109,12 @@ teleprompt <device-name> "cd /var/log && cat syslog | tail -n 20"
 
 ### Global Options
 * `--timeout <seconds>`: Override execution timeout (default is `30` seconds).
+* `--verbose` / `-v`: Print detailed connection diagnostics (TCP, handshake, auth stages).
 * `--db-path <path>`: Specify a custom database path (default is `~/.teleprompt/credentials.enc`).
 
 Example:
 ```bash
-teleprompt --timeout 60 --db-path ./custom.db my-device "df -h"
+teleprompt --verbose --timeout 60 --db-path ./custom.db my-device "df -h"
 ```
 
 ---
