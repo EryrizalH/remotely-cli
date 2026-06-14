@@ -15,6 +15,13 @@ pub fn get_master_key_path() -> Result<std::path::PathBuf, crate::error::Telepro
     Ok(home_dir.join(".teleprompt").join("master.key"))
 }
 
+/// Returns the path to the known_hosts file
+pub fn get_known_hosts_path() -> Result<std::path::PathBuf, crate::error::TelepromptError> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| crate::error::TelepromptError::Other("Could not find home directory".to_string()))?;
+    Ok(home_dir.join(".teleprompt").join("known_hosts"))
+}
+
 // Helper to get master password from env var, key file, or prompt the user
 pub fn get_master_password() -> Result<String, crate::error::TelepromptError> {
     if let Ok(pwd) = std::env::var("TELEPROMPT_KEY") {

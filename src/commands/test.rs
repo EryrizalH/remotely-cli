@@ -5,7 +5,7 @@ use crate::credentials::{self, ConnectionType};
 use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
-pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), TelepromptError> {
+pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64, verbose: bool) -> Result<(), TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
         None => credentials::get_default_db_path()?,
@@ -27,8 +27,8 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
     }, device.host, device.port);
 
     let test_res = match device.connection_type {
-        ConnectionType::Ssh => ssh::test_connection(device, timeout_secs),
-        ConnectionType::Telnet => telnet::test_connection(device, timeout_secs),
+        ConnectionType::Ssh => ssh::test_connection(device, timeout_secs, verbose),
+        ConnectionType::Telnet => telnet::test_connection(device, timeout_secs, verbose),
     };
 
     match test_res {

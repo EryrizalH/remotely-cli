@@ -18,12 +18,15 @@ pub fn execute_command(
     device: &Device,
     command: &str,
     timeout_secs: u64,
+    verbose: bool,
 ) -> Result<(i32, Vec<u8>, Vec<u8>), TelepromptError> {
     if device.connection_type != ConnectionType::Telnet {
         return Err(TelepromptError::Other("Device is not configured for Telnet".to_string()));
     }
-
     let addr = format!("{}:{}", device.host, device.port);
+    if verbose {
+        eprintln!("[verbose] Connecting to {}...", addr);
+    }
     let socket_addrs = addr.to_socket_addrs()
         .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
     let socket_addr = socket_addrs.into_iter().next()
@@ -32,11 +35,15 @@ pub fn execute_command(
         &socket_addr,
         Duration::from_secs(timeout_secs),
     ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    if verbose {
+        eprintln!("[verbose] TCP connected, awaiting login prompt...");
+    }
 
     stream.set_read_timeout(Some(Duration::from_secs(timeout_secs)))
         .map_err(|e| TelepromptError::Io(e))?;
     stream.set_write_timeout(Some(Duration::from_secs(timeout_secs)))
         .map_err(|e| TelepromptError::Io(e))?;
+
 
     let start_time = Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
@@ -139,9 +146,9 @@ pub fn execute_command(
     Ok((0, cleaned_output, Vec::new()))
 }
 
-pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), TelepromptError> {
+pub fn test_connection(device: &Device, timeout_secs: u64, verbose: bool) -> Result<(), TelepromptError> {
     // A connection test for telnet logs in and waits for the prompt
-    let (code, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs)?;
+    let (code, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs, verbose)?;
     if code == 0 {
         Ok(())
     } else {

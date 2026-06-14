@@ -16,6 +16,10 @@ pub struct Cli {
     #[arg(long, global = true, default_value = "30")]
     pub timeout: u64,
 
+    /// Verbose output for debugging connection issues
+    #[arg(long, short = 'v', global = true)]
+    pub verbose: bool,
+
     /// Custom path to the encrypted credential store
     #[arg(long, global = true)]
     pub db_path: Option<String>,

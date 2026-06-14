@@ -11,6 +11,7 @@ pub fn run(
     name: &str,
     command_args: &[String],
     timeout_secs: u64,
+    verbose: bool,
 ) -> Result<i32, TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
@@ -36,8 +37,8 @@ pub fn run(
 
     // Execute based on connection type
     let (exit_code, stdout, stderr) = match device.connection_type {
-        ConnectionType::Ssh => ssh::execute_command(device, &command, timeout_secs)?,
-        ConnectionType::Telnet => telnet::execute_command(device, &command, timeout_secs)?,
+        ConnectionType::Ssh => ssh::execute_command(device, &command, timeout_secs, verbose)?,
+        ConnectionType::Telnet => telnet::execute_command(device, &command, timeout_secs, verbose)?,
     };
 
     // Print stdout and stderr to match remote output exactly

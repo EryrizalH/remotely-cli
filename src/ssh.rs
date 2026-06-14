@@ -1,16 +1,17 @@
-use ssh2::{Session, KeyboardInteractivePrompt, Prompt};
+use ssh2::{Session, KeyboardInteractivePrompt, Prompt, CheckResult, KnownHostFileKind};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use crate::credentials::{Device, ConnectionType};
+use crate::credentials::{Device, ConnectionType, HostKeyPolicy};
+use crate::commands::get_known_hosts_path;
 use crate::error::TelepromptError;
-
 pub fn execute_command(
     device: &Device,
     command: &str,
     timeout_secs: u64,
+    verbose: bool,
 ) -> Result<(i32, Vec<u8>, Vec<u8>), TelepromptError> {
     if device.connection_type != ConnectionType::Ssh {
         return Err(TelepromptError::Other("Device is not configured for SSH".to_string()));
@@ -18,6 +19,9 @@ pub fn execute_command(
 
     // Connect to host
     let addr = format!("{}:{}", device.host, device.port);
+    if verbose {
+        eprintln!("[verbose] Connecting to {}...", addr);
+    }
     let socket_addrs = addr.to_socket_addrs()
         .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
     let socket_addr = socket_addrs.into_iter().next()
@@ -26,6 +30,9 @@ pub fn execute_command(
         &socket_addr,
         Duration::from_secs(timeout_secs),
     ).map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
+    if verbose {
+        eprintln!("[verbose] TCP connected, performing SSH handshake...");
+    }
 
     let mut sess = Session::new()
         .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
@@ -34,7 +41,16 @@ pub fn execute_command(
     sess.handshake()
         .map_err(|e| TelepromptError::ConnectionFailed(addr.clone(), e.to_string()))?;
 
+
+    if verbose {
+        eprintln!("[verbose] SSH handshake complete, verifying host key...");
+    }
+    verify_host_key(&sess, device, &addr)?;
+
     // Authenticate
+    if verbose {
+        eprintln!("[verbose] Authenticating as {}...", device.username);
+    }
     authenticate_session(&mut sess, device, &addr)?;
 
     let mut channel = sess.channel_session()
@@ -150,9 +166,9 @@ pub fn execute_command(
     Ok((exit_status, stdout, stderr))
 }
 
-pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), TelepromptError> {
+pub fn test_connection(device: &Device, timeout_secs: u64, verbose: bool) -> Result<(), TelepromptError> {
     // We execute a simple echo command to test connectivity
-    let (status, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs)?;
+    let (status, _, _) = execute_command(device, "echo 'teleprompt_ok'", timeout_secs, verbose)?;
     if status == 0 {
         Ok(())
     } else {
@@ -163,7 +179,7 @@ pub fn test_connection(device: &Device, timeout_secs: u64) -> Result<(), Telepro
 pub fn detect_sudo_capability(device: &mut Device, timeout_secs: u64) -> Result<(), TelepromptError> {
     // 1. Check if sudo is installed and if we can run without password
     // We run `sudo -n true`
-    let (status_no_pwd, _, _) = execute_command(device, "sudo -n true", timeout_secs)?;
+    let (status_no_pwd, _, _) = execute_command(device, "sudo -n true", timeout_secs, false)?;
     if status_no_pwd == 0 {
         device.sudo_capable = true;
         device.sudo_password_required = false;
@@ -171,10 +187,9 @@ pub fn detect_sudo_capability(device: &mut Device, timeout_secs: u64) -> Result<
     }
 
     // 2. Check if we can run with password
-    // We try to run `sudo -S true` (this will prompt for password)
     device.sudo_capable = true;
     device.sudo_password_required = true;
-    let (status_pwd, _, _) = execute_command(device, "sudo -S true", timeout_secs)?;
+    let (status_pwd, _, _) = execute_command(device, "sudo -S true", timeout_secs, false)?;
     if status_pwd == 0 {
         // Sudo works with password!
         Ok(())
@@ -183,6 +198,88 @@ pub fn detect_sudo_capability(device: &mut Device, timeout_secs: u64) -> Result<
         device.sudo_capable = false;
         device.sudo_password_required = false;
         Ok(())
+    }
+}
+
+/// Verifies the remote host key against the known_hosts file.
+fn verify_host_key(
+    sess: &Session,
+    device: &Device,
+    addr: &str,
+) -> Result<(), TelepromptError> {
+    if device.host_key_policy == HostKeyPolicy::Off {
+        return Ok(());
+    }
+
+    let (key, key_type) = sess.host_key()
+        .ok_or_else(|| TelepromptError::HostKeyRejected(
+            addr.to_string(),
+            "Could not retrieve host key from server".to_string(),
+        ))?;
+
+    let mut known_hosts = sess.known_hosts()
+        .map_err(|e| TelepromptError::HostKeyRejected(
+            addr.to_string(),
+            format!("Failed to initialize known_hosts: {}", e),
+        ))?;
+
+    // Try to load known_hosts file (OK if missing)
+    if let Ok(kh_path) = get_known_hosts_path() {
+        if kh_path.exists() {
+            known_hosts.read_file(&kh_path, KnownHostFileKind::OpenSSH)
+                .map_err(|e| TelepromptError::HostKeyRejected(
+                    addr.to_string(),
+                    format!("Failed to read known_hosts: {}", e),
+                ))?;
+        }
+    }
+
+    let host_for_check = if device.port != 22 {
+        format!("[{}]:{}", device.host, device.port)
+    } else {
+        device.host.clone()
+    };
+
+    let check_result = known_hosts.check(&host_for_check, key);
+
+    match check_result {
+        CheckResult::Match => Ok(()),
+        CheckResult::NotFound => {
+            if device.host_key_policy == HostKeyPolicy::AcceptNew {
+                // Add to known_hosts and save
+                let comment = &device.host;
+                known_hosts.add(&host_for_check, key, comment, key_type.into())
+                    .map_err(|e| TelepromptError::HostKeyRejected(
+                        addr.to_string(),
+                        format!("Failed to add host to known_hosts: {}", e),
+                    ))?;
+                // Append to file
+                if let Ok(kh_path) = get_known_hosts_path() {
+                    if let Some(parent) = kh_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    known_hosts.write_file(&kh_path, KnownHostFileKind::OpenSSH)
+                        .map_err(|e| TelepromptError::HostKeyRejected(
+                            addr.to_string(),
+                            format!("Failed to write known_hosts: {}", e),
+                        ))?;
+                }
+                Ok(())
+            } else {
+                Err(TelepromptError::HostKeyRejected(
+                    addr.to_string(),
+                    "Host not in known_hosts (policy: Strict)".to_string(),
+                ))
+            }
+        }
+        CheckResult::Mismatch => Err(TelepromptError::HostKeyRejected(
+            addr.to_string(),
+            "Host key mismatch — possible MITM attack!".to_string(),
+        )),
+        CheckResult::Failure => Err(TelepromptError::HostKeyRejected(
+            addr.to_string(),
+            "Host key check failed".to_string(),
+        )),
     }
 }
 
@@ -197,9 +294,9 @@ fn authenticate_session(
         if path.exists() {
             if let Err(_e) = sess.userauth_pubkey_file(
                 &device.username,
-                None,
+                None,  // public key file (None = read from private key)
                 path,
-                None, // We can expand to passphrases later
+                device.key_passphrase.as_deref(),
             ) {
                 // If pubkey failed and no password is saved, return auth error
                 if device.password.is_none() {

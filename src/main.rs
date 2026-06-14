@@ -23,6 +23,7 @@ fn main() {
 fn run_app(args: Cli) -> Result<i32, TelepromptError> {
     let db_path = args.db_path.as_ref().map(Path::new);
     let timeout = args.timeout;
+    let verbose = args.verbose;
 
     match args.command {
         Some(Commands::Init) => {
@@ -30,7 +31,7 @@ fn run_app(args: Cli) -> Result<i32, TelepromptError> {
             Ok(0)
         }
         Some(Commands::Add) => {
-            commands::add::run(db_path, timeout)?;
+            commands::add::run(db_path, timeout, verbose)?;
             Ok(0)
         }
         Some(Commands::Remove { name }) => {
@@ -38,7 +39,7 @@ fn run_app(args: Cli) -> Result<i32, TelepromptError> {
             Ok(0)
         }
         Some(Commands::Edit { name }) => {
-            commands::edit::run(db_path, &name, timeout)?;
+            commands::edit::run(db_path, &name, timeout, verbose)?;
             Ok(0)
         }
         Some(Commands::List) => {
@@ -46,7 +47,7 @@ fn run_app(args: Cli) -> Result<i32, TelepromptError> {
             Ok(0)
         }
         Some(Commands::Test { name }) => {
-            commands::test::run(db_path, &name, timeout)?;
+            commands::test::run(db_path, &name, timeout, verbose)?;
             Ok(0)
         }
         Some(Commands::InstallSkill) => {
@@ -75,7 +76,7 @@ fn run_app(args: Cli) -> Result<i32, TelepromptError> {
                 )));
             }
 
-            let exit_code = commands::exec::run(db_path, device_name, cmd_args, timeout)?;
+            let exit_code = commands::exec::run(db_path, device_name, cmd_args, timeout, verbose)?;
             Ok(exit_code)
         }
         None => {

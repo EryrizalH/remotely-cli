@@ -2,11 +2,11 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::commands::get_master_password;
-use crate::credentials::{self, ConnectionType, OsType};
+use crate::credentials::{self, ConnectionType, OsType, HostKeyPolicy};
 use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
-pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), TelepromptError> {
+pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64, verbose: bool) -> Result<(), TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
         None => credentials::get_default_db_path()?,
@@ -69,6 +69,18 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
                     device.key_path = Some(kp);
                     auth_changed = true;
                 }
+
+                // Prompt for key passphrase update
+                let current_pp = device.key_passphrase.as_deref().unwrap_or("");
+                let current_pp_label = if current_pp.is_empty() { "(not set)" } else { "(set, hidden)" };
+                print!("Update SSH Key Passphrase {} (press Enter to keep): ", current_pp_label);
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pp = rpassword::read_password().map_err(TelepromptError::Io)?;
+                if !pp.is_empty() {
+                    device.key_passphrase = Some(pp);
+                    auth_changed = true;
+                }
+
                 
                 print!("Update Sudo/Password (optional, press Enter to skip): ");
                 std::io::stdout().flush().map_err(TelepromptError::Io)?;
@@ -79,6 +91,7 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
                 }
             } else {
                 device.key_path = None;
+                device.key_passphrase = None;
                 print!("Update Password (press Enter to keep current): ");
                 std::io::stdout().flush().map_err(TelepromptError::Io)?;
                 let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
@@ -90,6 +103,7 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
         }
         ConnectionType::Telnet => {
             device.key_path = None;
+            device.key_passphrase = None;
             print!("Update Password (press Enter to keep current): ");
             std::io::stdout().flush().map_err(TelepromptError::Io)?;
             let pwd = rpassword::read_password().map_err(TelepromptError::Io)?;
@@ -106,13 +120,24 @@ pub fn run(db_path: Option<&Path>, name: &str, timeout_secs: u64) -> Result<(), 
     let os_type_changed = os_type != device.os_type;
     device.os_type = os_type;
 
-    let credentials_changed = host_changed || type_changed || port_changed || username_changed || auth_changed || os_type_changed;
+    // 7. Host key policy (SSH only)
+    let hk_changed;
+    if device.connection_type == ConnectionType::Ssh {
+        println!();
+        let policy = prompt_host_key_policy(Some(&device.host_key_policy))?;
+        hk_changed = policy != device.host_key_policy;
+        device.host_key_policy = policy;
+    } else {
+        hk_changed = false;
+    }
+
+    let credentials_changed = host_changed || type_changed || port_changed || username_changed || auth_changed || os_type_changed || hk_changed;
 
     if credentials_changed {
         println!("\nTesting updated connection details...");
         let test_res = match device.connection_type {
-            ConnectionType::Ssh => ssh::test_connection(&device, timeout_secs),
-            ConnectionType::Telnet => telnet::test_connection(&device, timeout_secs),
+            ConnectionType::Ssh => ssh::test_connection(&device, timeout_secs, verbose),
+            ConnectionType::Telnet => telnet::test_connection(&device, timeout_secs, verbose),
         };
 
         match test_res {
@@ -175,4 +200,33 @@ fn prompt_input(label: &str, current: Option<&str>) -> Result<String, Teleprompt
         }
     }
     Ok(input.to_string())
+}
+
+fn prompt_host_key_policy(current: Option<&HostKeyPolicy>) -> Result<HostKeyPolicy, TelepromptError> {
+    println!("Host Key Verification Policy:");
+    println!("1) AcceptNew — accept new hosts, verify existing (recommended)");
+    println!("2) Strict — reject unknown hosts");
+    println!("3) Off — skip verification (insecure)");
+
+    let default_val = match current {
+        None | Some(HostKeyPolicy::AcceptNew) => "1",
+        Some(HostKeyPolicy::Strict) => "2",
+        Some(HostKeyPolicy::Off) => "3",
+    };
+
+    loop {
+        print!("Enter choice (1-3) [{}]: ", default_val);
+        std::io::stdout().flush().map_err(TelepromptError::Io)?;
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).map_err(TelepromptError::Io)?;
+        let input = input.trim();
+        let selected = if input.is_empty() { default_val } else { input };
+
+        match selected {
+            "1" => return Ok(HostKeyPolicy::AcceptNew),
+            "2" => return Ok(HostKeyPolicy::Strict),
+            "3" => return Ok(HostKeyPolicy::Off),
+            _ => println!("Invalid choice. Please select 1, 2, or 3."),
+        }
+    }
 }

@@ -2,11 +2,11 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::commands::get_master_password;
-use crate::credentials::{self, ConnectionType, Device, OsType};
+use crate::credentials::{self, ConnectionType, Device, OsType, HostKeyPolicy};
 use crate::error::TelepromptError;
 use crate::{ssh, telnet};
 
-pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptError> {
+pub fn run(db_path: Option<&Path>, timeout_secs: u64, verbose: bool) -> Result<(), TelepromptError> {
     let resolved_path = match db_path {
         Some(p) => p.to_path_buf(),
         None => credentials::get_default_db_path()?,
@@ -76,6 +76,7 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
     // 6. Authentication details
     let mut password = None;
     let mut key_path = None;
+    let mut key_passphrase = None;
 
     match connection_type {
         ConnectionType::Ssh => {
@@ -83,6 +84,11 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
             if auth_method.trim().to_lowercase() == "key" {
                 let kp = prompt_input("SSH Private Key Path", None)?;
                 key_path = Some(kp);
+                // Prompt for key passphrase
+                print!("SSH Key Passphrase (optional, press Enter to skip): ");
+                std::io::stdout().flush().map_err(TelepromptError::Io)?;
+                let pp = rpassword::read_password().map_err(TelepromptError::Io)?;
+                key_passphrase = if pp.is_empty() { None } else { Some(pp) };
                 // Prompt for password anyway in case key is encrypted or we need password for sudo
                 print!("Sudo/Password (optional, press Enter to skip): ");
                 std::io::stdout().flush().map_err(TelepromptError::Io)?;
@@ -106,6 +112,12 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
     }
 
     // 6. OS Type Selection
+    // Host key policy (SSH only)
+    let host_key_policy = match connection_type {
+        ConnectionType::Ssh => prompt_host_key_policy(None)?,
+        ConnectionType::Telnet => HostKeyPolicy::default(),
+    };
+
     let os_type = OsType::prompt_selection(None)?;
 
     let mut device = Device {
@@ -115,17 +127,19 @@ pub fn run(db_path: Option<&Path>, timeout_secs: u64) -> Result<(), TelepromptEr
         username,
         password,
         key_path,
+        key_passphrase,
         connection_type: connection_type.clone(),
         sudo_capable: false,
         sudo_password_required: false,
         os_type,
+        host_key_policy,
     };
 
     // 7. Test connection and detect sudo
     println!("\nTesting connection to {}...", device.name);
     let test_res = match connection_type {
-        ConnectionType::Ssh => ssh::test_connection(&device, timeout_secs),
-        ConnectionType::Telnet => telnet::test_connection(&device, timeout_secs),
+        ConnectionType::Ssh => ssh::test_connection(&device, timeout_secs, verbose),
+        ConnectionType::Telnet => telnet::test_connection(&device, timeout_secs, verbose),
     };
 
     match test_res {
@@ -178,4 +192,33 @@ fn prompt_input(label: &str, default: Option<&str>) -> Result<String, Teleprompt
         }
     }
     Ok(input.to_string())
+}
+
+fn prompt_host_key_policy(current: Option<&HostKeyPolicy>) -> Result<HostKeyPolicy, TelepromptError> {
+    println!("\nHost Key Verification Policy:");
+    println!("1) AcceptNew — accept new hosts, verify existing (recommended)");
+    println!("2) Strict — reject unknown hosts");
+    println!("3) Off — skip verification (insecure)");
+
+    let default_val = match current {
+        None | Some(HostKeyPolicy::AcceptNew) => "1",
+        Some(HostKeyPolicy::Strict) => "2",
+        Some(HostKeyPolicy::Off) => "3",
+    };
+
+    loop {
+        print!("Enter choice (1-3) [{}]: ", default_val);
+        std::io::stdout().flush().map_err(TelepromptError::Io)?;
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).map_err(TelepromptError::Io)?;
+        let input = input.trim();
+        let selected = if input.is_empty() { default_val } else { input };
+
+        match selected {
+            "1" => return Ok(HostKeyPolicy::AcceptNew),
+            "2" => return Ok(HostKeyPolicy::Strict),
+            "3" => return Ok(HostKeyPolicy::Off),
+            _ => println!("Invalid choice. Please select 1, 2, or 3."),
+        }
+    }
 }

@@ -29,6 +29,9 @@ pub enum TelepromptError {
     #[error("Sudo authentication failed: {0}")]
     SudoFailed(String),
 
+    #[error("Host key rejected for '{0}': {1}")]
+    HostKeyRejected(String, String),
+
     #[error("Telnet error: {0}")]
     Telnet(String),
 
@@ -48,6 +51,7 @@ impl TelepromptError {
             Self::NotInitialized => 1,
             Self::InvalidPassword => 1,
             Self::Timeout(_) => 4,
+            Self::HostKeyRejected(_, _) => 2,
             Self::Io(_) => 1,
             Self::CryptoOrSerial(_) => 1,
             Self::SudoFailed(_) => 3,

@@ -1,0 +1,26 @@
+# Changelog
+
+## [0.2.0] — 2026-06-13
+
+### Added
+- **SSH private key passphrase support**: `Device` now stores `key_passphrase` for encrypted SSH keys. Prompt during `add`/`edit`, auto-wired into `userauth_pubkey_file`. (`src/credentials.rs`, `src/ssh.rs`, `src/commands/add.rs`, `src/commands/edit.rs`)
+- **Host key verification**: New `HostKeyPolicy` enum (`Strict`, `AcceptNew`, `Off`) on each device. Defaults to `AcceptNew` — auto-accepts new hosts, verifies known ones. Stored in `~/.teleprompt/known_hosts` (OpenSSH format). Mismatch triggers `HostKeyRejected` error (exit code 2). (`src/credentials.rs`, `src/ssh.rs`, `src/error.rs`, `src/commands/mod.rs`, `src/commands/add.rs`, `src/commands/edit.rs`)
+- **Verbose/debug mode**: `--verbose`/`-v` global flag; prints `eprintln!` diagnostics at each connection stage (TCP connect → handshake → host key verify → auth). (`src/cli.rs`, `src/main.rs`, `src/ssh.rs`, `src/telnet.rs`, `src/commands/exec.rs`, `src/commands/test.rs`)
+- **Auth column in `list`**: `list` command now shows per-device auth method: `password`, `key`, or `key (encrypted)`.
+
+### Changed
+- Test module rewritten with a shared `make_device()` helper — new fields (`key_passphrase`, `host_key_policy`) covered in all 4 test cases.
+- `.gitignore` whitelists `CHANGELOG.md` alongside `README.md`.
+
+## [0.1.3] — 2026-06-13
+
+### Fixed
+- SSH keyboard-interactive auth fallback & DNS resolution.
+
+## [0.1.2] — 2026-06-12
+
+### Fixed
+- Sudo prompt counting bug in SSH command execution.
+
+### Added
+- Warning against autonomous agent YOLO mode in docs.

@@ -24,7 +24,7 @@ pub fn run(db_path: Option<&Path>) -> Result<(), TelepromptError> {
     }
 
     let mut table = Table::new();
-    table.set_header(vec!["Device Name", "Host / IP", "Port", "User", "Type", "OS Type", "Sudo Access"]);
+    table.set_header(vec!["Device Name", "Host / IP", "Port", "User", "Type", "Auth", "OS Type", "Sudo Access"]);
 
     // Sort devices by name for consistent output
     let mut sorted_keys: Vec<&String> = store.devices.keys().collect();
@@ -36,7 +36,21 @@ pub fn run(db_path: Option<&Path>) -> Result<(), TelepromptError> {
             ConnectionType::Ssh => "SSH",
             ConnectionType::Telnet => "Telnet",
         };
-        
+
+        let auth_str = match dev.connection_type {
+            ConnectionType::Ssh => {
+                if dev.key_path.is_some() {
+                    if dev.key_passphrase.is_some() {
+                        "key (encrypted)"
+                    } else {
+                        "key"
+                    }
+                } else {
+                    "password"
+                }
+            }
+            ConnectionType::Telnet => "password",
+        };
         let sudo_str = if dev.sudo_capable {
             if dev.sudo_password_required {
                 "Yes (pwd injected)"
@@ -48,13 +62,13 @@ pub fn run(db_path: Option<&Path>) -> Result<(), TelepromptError> {
         };
 
         let os_str = dev.os_type.to_string();
-
         table.add_row(vec![
             &dev.name,
             &dev.host,
             &dev.port.to_string(),
             &dev.username,
             conn_type_str,
+            &auth_str,
             &os_str,
             sudo_str,
         ]);
